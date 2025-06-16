@@ -68,7 +68,7 @@ class DataLoader:
     def set_which_timesteps(self, which_timesteps):
         self.which_timesteps = which_timesteps
 
-    def load(self):
+    def load(self, print_files=False):
         """
         loads data from .gpw files
 
@@ -110,8 +110,9 @@ class DataLoader:
                 else:
                     self.read_gpw_to_dict(atoms_dict, calc_dict, energy, filename)
 
-        print(self.directory)
-        print(json.dumps(self.all_gpw_files, indent=4))
+        if print_files:
+            print(self.directory)
+            print(json.dumps(self.all_gpw_files, indent=4))
         return atoms_dict, calc_dict
 
     def append_to_dict(self, dictionary, key, value):

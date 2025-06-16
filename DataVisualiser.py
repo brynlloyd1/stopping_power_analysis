@@ -1,6 +1,7 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, CheckButtons
+from matplotlib.widgets import Slider
 
 
 class DataVisualiser:
@@ -10,9 +11,32 @@ class DataVisualiser:
             "stopping powers": np.array([8.41642534,  8.39403791,  9.61722966, 10.47531744, 11.12587244, 11.66446394, 12.3387949 , 12.60404201, 12.70727751, 12.74141819, 12.84432534, 12.96025452, 12.82696325, 12.74379889, 12.69518111, 12.56137771, 12.41201793, 12.33257865, 12.21160185, 12.09496251, 12.01462424, 11.898194, 11.77969121, 11.66621298, 11.50000087, 11.37880456, 11.31399968, 11.22186803, 11.06282411, 10.93625158, 10.81506187, 10.75385659, 10.58539531, 10.49800502, 10.48398759, 10.4024316, 10.27643047, 10.19540826, 10.01933624, 9.98213156, 9.99531111, 9.7817623 , 9.66781196,  9.78197921, 9.71504747, 9.51892708,  9.52356048,  9.36827356,  9.36659151,  9.22948771])
         }
 
+
+        path_to_srim_data = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/Hydrogen_in_Aluminium_SRIM.txt"
+        self.srim_stopping_data = self.load_srim(path_to_srim_data)
+
     ########################################
     # FOR PLOTTING STOPPING POWER ANALYSIS #
     ########################################
+
+    def load_srim(self, path):
+        raw_data = pd.read_csv(path,
+                               sep=r"\s+",
+                               skiprows = 23,
+                               header = None,
+                               skipfooter=14,
+                               engine="python")
+
+        data = pd.DataFrame(data = {
+            "E_k [keV]" : raw_data[0],
+            "S_e [eV/A]" : raw_data[2],
+            "S_n [eV/A]" : raw_data[3],
+            "S [eV/A]" : raw_data[2] + raw_data[3]
+        })
+
+        data.loc[0, "E_k [keV]"] /= 1e3   # just this first one is in eV??
+
+        return data
 
     def plot_all_fits(self, atoms_dict, fits):
         """
@@ -55,17 +79,14 @@ class DataVisualiser:
             energy, kinetic_energies = list(projectile_kinetic_energies.items())[i]
             kinetic_energies = np.array(kinetic_energies) * 1e-3  # convert from eV to keV
             _, positions = list(projectile_positions.items())[i]
-            # positions = np.array(positions)[:,-1,0]   # for every timestep, want projectile x_pos
             initial_position = positions[0]
             distance_travelled = np.array([np.linalg.norm(position - initial_position) for position in positions])
-
 
             # plot kinetic energy on left plot
             axs[i, 0].plot(distance_travelled, kinetic_energies, "x")
 
             # plot gradient of kinetic energy on right plot
             axs[i, 1].plot(distance_travelled[:-1], -np.diff(kinetic_energies)/np.diff(distance_travelled))
-
 
 
             ######################
@@ -121,7 +142,8 @@ class DataVisualiser:
         ax.set_xlabel("projectile initial kinetic energy [keV]")
         ax.set_ylabel(r"stopping power [eV/$\AA$]")
 
-        ax.plot(self.geant4_stopping_data["energies"], self.geant4_stopping_data["stopping powers"], "-", label="GEANT4")
+        # ax.plot(self.geant4_stopping_data["energies"], self.geant4_stopping_data["stopping powers"], "-", label="GEANT4")
+        ax.plot(self.srim_stopping_data["E_k [keV]"], self.srim_stopping_data["S [eV/A]"], label="SRIM")
         for trajectory_name, trajectory in stopping_power_data.items():
             ax.plot(trajectory["energies"], trajectory["stopping powers"], "-x", label=trajectory_name)
         ax.legend()
