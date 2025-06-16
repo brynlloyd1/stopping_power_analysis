@@ -1,10 +1,22 @@
 from gpaw import restart
 
 import numpy as np
+import pandas as pd
 
 import os
 import re
 import json
+
+
+class Data:
+    def __init__(self):
+        self.atom_list = []
+        self.calc_list = []
+        self.positions = np.array([])
+        self.projectile_positions = np.array([])
+        self.projectile_kinetic_energies = np.array([])
+        self.electron_densities = np.array([])
+
 
 class DataLoader:
     def __init__(self, directory):
@@ -20,6 +32,9 @@ class DataLoader:
         self._energy_timestep_regex_pattern = re.compile(r"(\d+)k_step(\d+)")
 
         self.all_gpw_files = self.get_all_gpaw_files()
+
+
+        self.data = Data()
 
 
     def get_all_gpaw_files(self):
@@ -68,7 +83,36 @@ class DataLoader:
     def set_which_timesteps(self, which_timesteps):
         self.which_timesteps = which_timesteps
 
-    def load(self, print_files=False):
+
+    def load(self, force_load_gpw = False, print_filenames = False):
+
+        # can explicitely read from gpw files. eg if you want electron density data
+        if force_load_gpw:
+            data = self.load_gpw(write_to_csv = False)
+
+
+        all_files = os.listdir(self.directory)
+        # if .csv file does not exist, data has to be loaded from .gpw files
+        if not any(filename.endswith(".csv") for filename in all_files):
+            data = self.load_gpw(write_to_csv = True)
+
+        # load_csv
+        for filename in all_files:
+
+            df = pd.read_csv(self.directory + filename)
+            # something like
+            # positions = np.reshape((), (n_atoms, 3))
+
+            self.data.positions = np.append(self.data.positions, positions, axis=-1)
+            self.data.projectile_positions = np.append(self.data.projectile_positions, projectile_positions, axis=-1)
+            self.data.projectile_kinetic_energies = np.append(self.data.projectile_kinetic_energies, projectile_kinetic_energies, axis=-1)
+
+
+    def write_to_csv(self):
+        pass
+
+
+    def load_gpw(self, write_to_csv = False, print_files=False):
         """
         loads data from .gpw files
 

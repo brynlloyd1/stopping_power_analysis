@@ -34,7 +34,7 @@ class EhrenfestAnalysis:
         """sets which timesteps are to be loaded by the DataLoader instance"""
         self.data_handlers[trajectory_name].data_loader.set_which_timesteps(which_timesteps)
 
-    def load_gpw_data(self, trajectory_name):
+    def load_data(self, trajectory_name):
         """instructs the instance of DataLoaded stored in the DataHandler instance to load in the data"""
         data_handler = self.data_handlers[trajectory_name]
         data_handler.atoms_dict, data_handler.calc_dict = data_handler.data_loader.load()
