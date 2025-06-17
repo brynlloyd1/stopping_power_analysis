@@ -1,8 +1,9 @@
-from DataLoader import DataLoader
-from DataProcessor import DataProcessor
+from DataLoader import DataLoader, Data
+from DataProcessor import DataProcessor, Fit
 from DataVisualiser import DataVisualiser
 
 import os
+from typing import Dict
 
 class DataHandler:
     def __init__(self, directory):
@@ -12,8 +13,7 @@ class DataHandler:
         self.data_processor = DataProcessor()
         self.data_visualiser = DataVisualiser()
 
-        self.atoms_dict = {}
-        self.calc_dict = {}
-        self.fits = {}
+        self.all_data: Dict[str, Data] = {}
+        self.fits: Dict[str, Fit] = {}
 
 

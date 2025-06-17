@@ -5,169 +5,156 @@ import pandas as pd
 
 import os
 import re
-import json
-
+from typing import Dict
 
 class Data:
     def __init__(self):
-        self.atom_list = []
+        self.atoms_list = []
         self.calc_list = []
-        self.positions = np.array([])
-        self.projectile_positions = np.array([])
+        self.projectile_positions = np.empty((0,3))
         self.projectile_kinetic_energies = np.array([])
         self.electron_densities = np.array([])
-
 
 class DataLoader:
     def __init__(self, directory):
         """
-        (data loader doesnt store any data - all data is passed back to the data handler class)
+        (data loader doesn't store any data - all data is passed back to the data handler class)
         """
         self.directory = directory
         self.which_energies = ["all"]
         self.which_timesteps = "all"
 
-        self._energy_regex_pattern = re.compile(r"(\d+)k_step")
+        self._energy_regex_pattern = re.compile(r"(\d+)k")
         self._timestep_regex_pattern = re.compile(r"k_step(\d+)")
         self._energy_timestep_regex_pattern = re.compile(r"(\d+)k_step(\d+)")
 
-        self.all_gpw_files = self.get_all_gpaw_files()
 
-
-        self.data = Data()
-
-
-    def get_all_gpaw_files(self):
+    def get_files(self, kind):
         """
-        gets .gpw files from a given directory
+        returns a dictionary of all files of a given type, separated by their energies
 
-        Returns:
-        dict: key is energy (in keV), value is a list of filenames, sorted by ascending timestep
+        Parameters:
+            kind (str)
         """
-
-        # get all files, and throw any that arent .gpw
         all_files = os.listdir(self.directory)
-        all_gpw_files = [f for f in all_files if f.endswith(".gpw")]
+        all_files_kind = [f for f in all_files if f.endswith("." + kind)]
 
         filenames_temp = {}
-        timesteps_temp = {}
+        if kind == "csv":
+            for filename in all_files_kind:
+                match = self._energy_regex_pattern.search(filename)
+                if not match:
+                    continue
+                energy = match.group(1)
+                filenames_temp = self.append_to_dict(filenames_temp, energy, filename)
 
-        # regex to extract energy and timestep
-        for filename in all_gpw_files:
-            match = self._energy_timestep_regex_pattern.search(filename)
-            if not match:
-                continue
-            energy, timestep = match.group(1), match.group(2)
 
-            filenames_temp = self.append_to_dict(filenames_temp, energy, filename)
-            timesteps_temp = self.append_to_dict(timesteps_temp, energy, timestep)
+        elif kind == "gpw":
+            timesteps_temp = {}
+            for filename in all_files_kind:
+                match = self._energy_timestep_regex_pattern.search(filename)
+                if not match:
+                    continue
+                energy, timestep = match.group(1), match.group(2)
+                filenames_temp = self.append_to_dict(filenames_temp, energy, filename)
+                timesteps_temp = self.append_to_dict(timesteps_temp, energy, timestep)
 
-        # sort files in ascending order according to the timestep
-        for energy in filenames_temp.keys():
-            paired = sorted(zip(map(int, timesteps_temp[energy]), filenames_temp[energy]))
-            _, filenames_sorted = zip(*paired)
-            filenames_temp[energy] = list(filenames_sorted)
+            # sort files in ascending order according to the timestep
+            for energy in filenames_temp.keys():
+                paired = sorted(zip(map(int, timesteps_temp[energy]), filenames_temp[energy]))
+                _, filenames_sorted = zip(*paired)
+                filenames_temp[energy] = list(filenames_sorted)
+        else:
+            raise ValueError("kind must be 'csv' or 'gpw'")
 
         # rename keys
-        filename_dict = {f"{key} keV": value for key, value in filenames_temp.items()}
-
+        filenames_temp = {f"{key} keV": value for key, value in filenames_temp.items()}
         # sort the energies so that they are also in ascending order
-        sorted_items = sorted(filename_dict.items(), key=lambda item: int(item[0].split()[0]))
+        sorted_items = sorted(filenames_temp.items(), key=lambda item: int(item[0].split()[0]))
         filename_dict = dict(sorted_items)
 
         return filename_dict
 
-    def set_which_energies(self, which_energies):
-        self.which_energies = which_energies
-
-    def set_which_timesteps(self, which_timesteps):
-        self.which_timesteps = which_timesteps
-
-
-    def load(self, force_load_gpw = False, print_filenames = False):
-
-        # can explicitely read from gpw files. eg if you want electron density data
-        if force_load_gpw:
-            data = self.load_gpw(write_to_csv = False)
-
-
-        all_files = os.listdir(self.directory)
-        # if .csv file does not exist, data has to be loaded from .gpw files
-        if not any(filename.endswith(".csv") for filename in all_files):
-            data = self.load_gpw(write_to_csv = True)
-
-        # load_csv
-        for filename in all_files:
-
-            df = pd.read_csv(self.directory + filename)
-            # something like
-            # positions = np.reshape((), (n_atoms, 3))
-
-            self.data.positions = np.append(self.data.positions, positions, axis=-1)
-            self.data.projectile_positions = np.append(self.data.projectile_positions, projectile_positions, axis=-1)
-            self.data.projectile_kinetic_energies = np.append(self.data.projectile_kinetic_energies, projectile_kinetic_energies, axis=-1)
-
-
-    def write_to_csv(self):
-        pass
-
-
-    def load_gpw(self, write_to_csv = False, print_files=False):
+    def load_data(self, force_load_gpw=False):
         """
-        loads data from .gpw files
+        If .csv files exist, loads position and kinetic energy data from them
+        if not, uses gpaw.restart to load in atoms, calc
+        Data that is loaded is stored in an instance of Data
 
         Parameters:
-        directory (str): path to file containing .gpw files
-        which_energies (list[str]): list of energies to load in. ["all"] will load in all energies
-        which_timesteps (str): which timesteps to load in. Options are "all", or "::10" (like the slice)
+            force_load_gpw (bool)
 
         Returns:
-        atoms_dict (Dict[str, list[Atoms]]): Key is energy (eg. "40 keV"), value is a list of Atoms objects
-        calc_dict (Dict[str, list[Calc]]): Key is energy, value is a list of GPAW objects
+            data_dict (Dict[str, Data]): key is energy, value is Data instance
         """
 
+        # check if existence of csv files
+        all_gpw_files = self.get_files("gpw")
+        all_csv_files = self.get_files("csv")
+
         if self.which_energies == ["all"]:
-            self.which_energies = self.all_gpw_files.keys()
+            self.which_energies = all_gpw_files.keys()
 
-        # check that all specified energies are in all_files.keys()
+        all_data = {}
         for energy in self.which_energies:
-            if energy in self.all_gpw_files.keys():
-                continue
+            write_flag = False
+
+            data = Data()
+
+            if not energy in all_csv_files.keys() or force_load_gpw:
+                write_flag = not (energy in all_csv_files.keys())  # only want to write if the csv files don't already exist
+                for filename in all_gpw_files[energy]:
+                    atoms, calc = restart(self.directory + filename)
+                    data.atoms_list.append(atoms)
+                    data.calc_list.append(calc)
+                    data.projectile_positions = np.vstack([data.projectile_positions, atoms.get_positions()[-1]])
+                    data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, atoms.get_kinetic_energy())
+
             else:
-                raise KeyError(f"{energy} not found in this directory")
+                write_flag = False
+                for filename in all_csv_files[energy]:
+                    df = pd.read_csv(self.directory + filename)
+                    data.projectile_positions = df[["projectile x [A]", "projectile y [A]", "projectile z [A]"]].to_numpy()
+                    data.projectile_kinetic_energies = df["projectile KE [eV]"].to_numpy()
 
-        atoms_dict = {}
-        calc_dict = {}
-        for energy in self.which_energies:
-            for filename in self.all_gpw_files[energy]:
+            if write_flag:
+                self.write_csv(energy, data)
 
-                if self.which_timesteps == "::10":
-                    match = self._timestep_regex_pattern.search(filename)
-                    if not match:
-                        continue
-                    timestep = int(match.group(1))
-                    if timestep % 10 != 0:
-                        continue
-                    else:
-                        self.read_gpw_to_dict(atoms_dict, calc_dict, energy, filename)
+            # all_data = self.append_to_dict(all_data, energy, data)
+            all_data[energy] = data
 
-                else:
-                    self.read_gpw_to_dict(atoms_dict, calc_dict, energy, filename)
+        return all_data
 
-        if print_files:
-            print(self.directory)
-            print(json.dumps(self.all_gpw_files, indent=4))
-        return atoms_dict, calc_dict
+    def write_csv(self, energy, data):
+        """
+        writes projectile positions and kinetic energies to a csv file
 
-    def append_to_dict(self, dictionary, key, value):
+        Parameters:
+            energy (str): e.g. "40 keV"
+            data (Data)
+        """
+
+        filename = f"Al_stopping_{energy.rstrip(' keV')}k"
+
+        timesteps = list(range(1, len(data.projectile_positions) + 1))
+        df = pd.DataFrame(data = {
+            "timestep": timesteps,
+            "projectile x [A]": data.projectile_positions[:, 0],
+            "projectile y [A]": data.projectile_positions[:, 1],
+            "projectile z [A]": data.projectile_positions[:, 2],
+            "projectile KE [eV]" : data.projectile_kinetic_energies
+        }).to_csv(self.directory + filename + ".csv", index=False)
+
+
+    def append_to_dict(self, dictionary: Dict[str, [any]], key, value):
         """
         appends to a dictionary, where the value is a list of elements
 
-        Paramters:
-        dictionary (dict[str, __])
+        Parameters:
+            dictionary (dict[str, __])
 
         Returns:
-        dictionary (dict[str, __])
+            dictionary (dict[str, __])
         """
 
         if key not in dictionary:
@@ -176,14 +163,6 @@ class DataLoader:
             dictionary[key].append(value)
 
         return dictionary
-
-    # can probably move the append_to_dict funtion to be a method of this class
-    def read_gpw_to_dict(self, atoms_dict, calc_dict, energy, filename):
-        """uses gpaw.restart to load .gpw files. Writes data to dictionaries"""
-        atoms, calc = restart(self.directory + filename)
-        self.atoms_dict = self.append_to_dict(atoms_dict, energy, atoms)
-        self.calc_dict = self.append_to_dict(calc_dict, energy, calc)
-
 
     def check_for_npy(self, directory, energy):
         """checks if a .npy containing electron density data exists"""
@@ -202,3 +181,4 @@ class DataLoader:
         trajectory_name = os.path.basename(directory.rstrip("/"))
         npy_filename = f"{trajectory_name}_{energy}"
         np.save(f"{trajectory_name}_{energy}", np.array(electron_density_list))
+

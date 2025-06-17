@@ -1,4 +1,7 @@
 import numpy as np
+from DataLoader import Data
+from typing import Dict, List
+
 
 class Fit:
     """
@@ -18,22 +21,24 @@ class DataProcessor:
         pass
 
 
-    def calculate_stopping_powers(self, atoms_dict, crop=[None, None]):
+    # def calculate_stopping_powers(self, atoms_dict, crop=[None, None]):
+    def calculate_stopping_powers(self,
+                                  all_data: Dict[str, Data],
+                                  crop: List[int | None] = [None, None]):
         """
+        performs linear fits to kinetic energy data to extract averaged stopping powers
         Parameters:
-        atoms_dict (Dict[str, List[Atoms]])
-        calc_dict (Dict[str, List[GPAW]])
+            all_data (Dict[str, Data])
+            crop (List[int | None])
+
+        Returns:
+            fits_information (Dict[str, Fit])
         """
+        items = all_data.items()
+        projectile_positions = {key: value.projectile_positions for key,value in all_data.items()}
+        projectile_kinetic_energies = {key: value.projectile_kinetic_energies for key,value in all_data.items()}
 
-        projectile_positions = {energy: [atoms.get_positions()
-                                            for atoms in atoms_list]
-                                for energy, atoms_list in atoms_dict.items()}
-
-        projectile_kinetic_energies = {energy: [atoms.get_kinetic_energy()
-                                                for atoms in atoms_list]
-                                        for energy, atoms_list in atoms_dict.items()}
-
-        fits_information = {}   # dictionary of energy : Fit
+        fits_information: Dict[str, Fit] = {}
 
         for i in range(len(projectile_kinetic_energies.keys())):
             # get raw data

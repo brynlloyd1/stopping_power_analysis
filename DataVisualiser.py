@@ -3,6 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
+from DataLoader import Data
+from typing import Dict
+
 
 class DataVisualiser:
     def __init__(self):
@@ -38,23 +41,16 @@ class DataVisualiser:
 
         return data
 
-    def plot_all_fits(self, atoms_dict, fits):
+    def plot_all_fits(self, all_data: Dict[str, Data], fits):
+
         """
         for every projectile energy, creates 2 subplots
         1. projectile kinetic energy against distance travelled
         2. gradient of kinetic energy against distance travelled
         """
 
-        ######################
-        # SORT OUT VARIABLES #
-        ######################
-        projectile_positions = {energy: [atoms.get_positions()
-                                            for atoms in atoms_list]
-                                for energy, atoms_list in atoms_dict.items()}
-
-        projectile_kinetic_energies = {energy: [atoms.get_kinetic_energy()
-                                                for atoms in atoms_list]
-                                        for energy, atoms_list in atoms_dict.items()}
+        projectile_positions = {key: value.projectile_positions for key,value in all_data.items()}
+        projectile_kinetic_energies = {key: value.projectile_kinetic_energies for key,value in all_data.items()}
 
         #################
         # CREATE FIGURE #
@@ -153,8 +149,6 @@ class DataVisualiser:
     ######################################
     # FOR VISUALISING SIMULATION RESULTS #
     ######################################
-
-
 
 
     def visualise_electron_density(self, electron_densities):
