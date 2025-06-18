@@ -14,7 +14,6 @@ class DataVisualiser:
             "stopping powers": np.array([8.41642534,  8.39403791,  9.61722966, 10.47531744, 11.12587244, 11.66446394, 12.3387949 , 12.60404201, 12.70727751, 12.74141819, 12.84432534, 12.96025452, 12.82696325, 12.74379889, 12.69518111, 12.56137771, 12.41201793, 12.33257865, 12.21160185, 12.09496251, 12.01462424, 11.898194, 11.77969121, 11.66621298, 11.50000087, 11.37880456, 11.31399968, 11.22186803, 11.06282411, 10.93625158, 10.81506187, 10.75385659, 10.58539531, 10.49800502, 10.48398759, 10.4024316, 10.27643047, 10.19540826, 10.01933624, 9.98213156, 9.99531111, 9.7817623 , 9.66781196,  9.78197921, 9.71504747, 9.51892708,  9.52356048,  9.36827356,  9.36659151,  9.22948771])
         }
 
-
         path_to_srim_data = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/Hydrogen_in_Aluminium_SRIM.txt"
         self.srim_stopping_data = self.load_srim(path_to_srim_data)
 
@@ -95,7 +94,18 @@ class DataVisualiser:
                     pfit = np.poly1d([-1e-3*self.geant4_stopping_data["stopping powers"][index][0], self.geant4_stopping_data["energies"][index][0]])
                     axs[i, 0].plot(distance_travelled, pfit(distance_travelled), label=rf"Geant4: $S_e$ = {self.geant4_stopping_data['stopping powers'][index][0]:.1f} [eV/$\AA$]")
                 except:
-                    print("no geant4 fit for one of the energies")
+                    print(f"no geant4 fit for {energy}")
+
+
+            # TODO: WONT FIND ANYTHING AT ALL
+            plot_srim_stopping = False
+            if plot_srim_stopping:
+                try:
+                    index = self.srim_stopping_data[np.isclose(self.srim_stopping_data["E_k [keV]"], energy.rstrip(" keV"))]
+                    p = np.poly1d(-1e-3 * self.srim_stopping_data.loc[index, "S [ev/A]"], self.srim_stopping_data.loc[index, "E_k [keV]"])
+                    axs[i, 0].plot(distance_travelled, p(distance_travelled)) #, label=rf"SRIM: S = {self.}"
+                except:
+                    print(f"no srim fit for {energy}")
 
             ########################
             # PLOT STOPPING FITS?? #
@@ -126,6 +136,8 @@ class DataVisualiser:
                 axs[i, 0].plot(distance_travelled[crop[0]:n_timesteps - (crop[1] or 0)], kinetic_energies[crop[0]:n_timesteps - (crop[1] or 0)], "x", color="red")
                 axs[i, 1].plot(distance_travelled[crop[0] : n_timesteps - (crop[1] or 0) - 1], -np.diff(kinetic_energies)[crop[0] : n_timesteps - (crop[1] or 0) - 1]/np.diff(distance_travelled)[crop[0] : n_timesteps - (crop[1] or 0) - 1], "x", color="red")
                 axs[i,0].legend()
+
+        plt.show()
 
     def geant4_comparison(self, stopping_power_data):
         """

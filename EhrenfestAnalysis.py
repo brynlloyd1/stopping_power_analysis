@@ -1,5 +1,10 @@
 from DataHandler import DataHandler
-from typing import List
+
+# imports for type definitions
+from typing import List, Dict
+from DataLoader import Data
+from DataProcessor import DataProcessor, Fit
+from DataLoader import DataLoader
 
 class EhrenfestAnalysis:
     def __init__(self):
@@ -19,7 +24,7 @@ class EhrenfestAnalysis:
         self.data_handlers[data_handler.trajectory_name] = data_handler
         return data_handler.trajectory_name
 
-    def set_name(self, old_name, new_name):
+    def set_name(self, old_name: str, new_name: str):
         """changes the name of a trajectory, which is stored by the DataHandler instance"""
         if new_name in self.data_handlers.keys():
             raise KeyError(f"{new_name} already exists")
@@ -27,21 +32,51 @@ class EhrenfestAnalysis:
         self.data_handlers[old_name].trajectory_name = new_name
         self.data_handlers[new_name] = self.data_handlers[old_name].pop()
 
-    def load_data(self, trajectory_name):
-        """instructs the instance of DataLoaded stored in the DataHandler instance to load in the data"""
-        data_handler = self.data_handlers[trajectory_name]
+    def load_data(self,
+                  trajectory_name: str,
+                  force_load_gpw = False):
+        """
+        instructs the instance of DataLoader stored in the DataHandler instance to load in the data
+
+        Parameters:
+            trajectory_name (str)
+            force_load_gpw (bool, optional): Can force loading of gpw files (vs loading csv files), e.g. if you want to use electron_densities
+        """
+
+        data_handler: DataHandler = self.data_handlers[trajectory_name]
         # data_handler.atoms_dict, data_handler.calc_dict = data_handler.data_loader.load_data()
         data_handler.all_data = data_handler.data_loader.load_data()
+
+    def load_densities(self,
+                       trajectory_name: str):
+        """
+        loads electron density data either by using gpaw.restart or by loading in .npy files
+        """
+
+        data_handler: DataHandler = self.data_handlers[trajectory_name]
+        all_data_temp = data_handler.data_loader.load_densities()
+
+        # check if projectile positions has been written to. If so, need to modify the electron_densities attribute
+        # otherwise, can just overwrite all_data with the return of load_densities
+
+        if not data_handler.all_data:
+            data_handler.all_data = all_data_temp
+        else:
+            for energy in data_handler.all_data.keys():
+                data_handler.all_data[energy].electron_densities = all_data_temp[energy].electron_densities
+
+
+
+
 
     def calculate_stopping_curve(self,
                                  trajectory_name: str,
                                  crop: List[int | None] = [11, None]):
         """tells the DataProcessor instance to perform fits to kinetic energy data"""
-        handler = self.data_handlers[trajectory_name]
-        processor = handler.data_processor
+        handler: DataHandler = self.data_handlers[trajectory_name]
+        processor: DataProcessor = handler.data_processor
         # fits_information = processor.calculate_stopping_powers(handler.atoms_dict, crop=crop)
-        fits_information = processor.calculate_stopping_powers(handler.all_data, crop=crop)
-        handler.fits = fits_information
+        handler.fits = processor.calculate_stopping_powers(handler.all_data, crop=crop)
 
 
     def view_fits(self, trajectory_name: str):
@@ -52,7 +87,7 @@ class EhrenfestAnalysis:
         # visualiser.plot_all_fits(handler.atoms_dict, handler.fits)
 
 
-    def compare_to_geant4(self, trajectory_names):
+    def compare_to_montecarlo(self, trajectory_names):
         """comparison of a stopping curve to Monte Carlo stopping power curve"""
         stopping_power_data = {}
         for trajectory_name in trajectory_names:
@@ -71,14 +106,32 @@ class EhrenfestAnalysis:
 
     def visualise_electron_density(self, trajectory_name, energy):
         """DataVisualiser.visualise_electron_density called"""
+
         handler = self.data_handlers[trajectory_name]
-        loader = handler.data_loader
+        loader: DataLoader = handler.data_loader
         visualiser = handler.data_visualiser
 
-        if loader.check_for_npy(handler.directory_name, energy):
-            electron_density_list = loader.load_from_npy(handler.directory_name, energy)
-        else:
-            electron_density_list = [calc.get_all_electron_density() for calc in handler.calc_dict[energy]]
-            loader.save_to_npy(handler.directory_name, energy, electron_density_list)
+        # TODO: NEED TO CHECK FOR ELECTRON DENSITIES
+        # this doesnt work if showing electron densities in the first thing you do bc all_data has no keys
+        if handler.all_data[energy].electron_densities is None:
+            loader.load_densities()
 
+        electron_density_list = handler.all_data[energy].electron_densities
         visualiser.visualise_electron_density(electron_density_list)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

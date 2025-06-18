@@ -20,8 +20,6 @@ class DataProcessor:
     def __init__(self):
         pass
 
-
-    # def calculate_stopping_powers(self, atoms_dict, crop=[None, None]):
     def calculate_stopping_powers(self,
                                   all_data: Dict[str, Data],
                                   crop: List[int | None] = [None, None]):

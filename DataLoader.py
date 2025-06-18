@@ -1,11 +1,12 @@
 from gpaw import restart
+from ase.units import eV, _amu
 
 import numpy as np
 import pandas as pd
 
 import os
 import re
-from typing import Dict
+from typing import Dict, List
 
 class Data:
     def __init__(self):
@@ -13,7 +14,7 @@ class Data:
         self.calc_list = []
         self.projectile_positions = np.empty((0,3))
         self.projectile_kinetic_energies = np.array([])
-        self.electron_densities = np.array([])
+        self.electron_densities = None
 
 class DataLoader:
     def __init__(self, directory):
@@ -40,7 +41,7 @@ class DataLoader:
         all_files_kind = [f for f in all_files if f.endswith("." + kind)]
 
         filenames_temp = {}
-        if kind == "csv":
+        if kind == "csv" or kind == "npy":
             for filename in all_files_kind:
                 match = self._energy_regex_pattern.search(filename)
                 if not match:
@@ -85,7 +86,7 @@ class DataLoader:
             force_load_gpw (bool)
 
         Returns:
-            data_dict (Dict[str, Data]): key is energy, value is Data instance
+            all_data (Dict[str, Data]): key is energy, value is Data instance
         """
 
         # check if existence of csv files
@@ -107,8 +108,16 @@ class DataLoader:
                     atoms, calc = restart(self.directory + filename)
                     data.atoms_list.append(atoms)
                     data.calc_list.append(calc)
+
                     data.projectile_positions = np.vstack([data.projectile_positions, atoms.get_positions()[-1]])
+
+                    # TODO: THIS GIVES KINETIC ENERGY OF ENTIRE SYSTEM
+                    #       CODE BELOW CALCULATES FROM VELOCITIES, BUT THERE IS A MISTAKE IN THE UNITS SOMEWHERE
                     data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, atoms.get_kinetic_energy())
+                    # projectile_velocities = atoms.get_velocities()[-1] * 100   # A/ps -> m/s
+                    # projectile_mass = atoms.get_masses()[-1] * _amu   # atomic mass units -> kg
+                    # kinetic_energy = 0.5 * projectile_mass * np.sum(projectile_velocities**2) / eV   # Joules -> eV
+                    # data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, kinetic_energy)
 
             else:
                 write_flag = False
@@ -125,16 +134,23 @@ class DataLoader:
 
         return all_data
 
-    def write_csv(self, energy, data):
+    def write_csv(self, energy, data, overwrite_flag = False):
         """
         writes projectile positions and kinetic energies to a csv file
 
         Parameters:
             energy (str): e.g. "40 keV"
             data (Data)
+            overwrite_flag (bool): prevents accidental overwriting of existing csv
         """
 
-        filename = f"Al_stopping_{energy.rstrip(' keV')}k"
+        filename = f"Al_stopping_{energy.rstrip(' keV')}k.csv"
+        if not overwrite_flag:
+            if filename in os.listdir(self.directory):
+                print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
+                return
+
+        print(f"Writing {filename}")
 
         timesteps = list(range(1, len(data.projectile_positions) + 1))
         df = pd.DataFrame(data = {
@@ -143,15 +159,17 @@ class DataLoader:
             "projectile y [A]": data.projectile_positions[:, 1],
             "projectile z [A]": data.projectile_positions[:, 2],
             "projectile KE [eV]" : data.projectile_kinetic_energies
-        }).to_csv(self.directory + filename + ".csv", index=False)
+        }).to_csv(self.directory + filename, index=False)
 
 
-    def append_to_dict(self, dictionary: Dict[str, [any]], key, value):
+    def append_to_dict(self, dictionary: Dict[str, List], key, value):
         """
         appends to a dictionary, where the value is a list of elements
 
         Parameters:
             dictionary (dict[str, __])
+            key (str)
+            value (list)
 
         Returns:
             dictionary (dict[str, __])
@@ -164,21 +182,56 @@ class DataLoader:
 
         return dictionary
 
-    def check_for_npy(self, directory, energy):
-        """checks if a .npy containing electron density data exists"""
-        trajectory_name = os.path.basename(directory.rstrip("/"))
-        npy_filename = f"{trajectory_name}_{energy}"
-        return npy_filename in os.listdir(directory)
 
-    def load_from_npy(self, directory, energy):
-        """loads .npy containing electron density data exists"""
-        trajectory_name = os.path.basename(directory.rstrip("/"))
-        npy_filename = f"{trajectory_name}_{energy}"
-        return np.load(directory+npy_filename)
+    def load_densities(self):
+        all_gpw_files = self.get_files("gpw")
+        all_npy_files = self.get_files("npy")
 
-    def save_to_npy(self, directory, energy, electron_density_list):
-        """writes .npy containing electron density data exists"""
-        trajectory_name = os.path.basename(directory.rstrip("/"))
-        npy_filename = f"{trajectory_name}_{energy}"
-        np.save(f"{trajectory_name}_{energy}", np.array(electron_density_list))
+        if self.which_energies == ["all"]:
+            self.which_energies = all_gpw_files.keys()
 
+        all_data = {}
+        for energy in self.which_energies:
+            write_flag = False
+
+            data = Data()
+            electron_densities_temp = []
+            if not energy in all_npy_files.keys():
+                write_flag = True
+                for filename in all_gpw_files[energy]:
+                    atoms, calc = restart(self.directory + filename)
+                    data.atoms_list.append(atoms)
+                    data.calc_list.append(calc)
+                    electron_densities_temp.append(calc.get_all_electron_density())
+
+                data.electron_densities = np.stack(electron_densities_temp)
+
+            else:
+                write_flag = False
+                for filename in all_npy_files[energy]:
+                    data.electron_densities = np.load(self.directory + filename)
+
+            if write_flag:
+                self.write_npy(energy, data)
+
+            all_data[energy] = data
+
+        return all_data
+
+    def write_npy(self, energy, data, overwrite_flag = False):
+        """
+        writes electron densities to a npy file
+
+        Parameters:
+            energy (str): e.g. "40 keV"
+            data (Data)
+            overwrite_flag (bool): prevents accidental overwriting of existing npy file
+        """
+        filename = f"Al_stopping_{energy.rstrip(' keV')}k.npy"
+        if not overwrite_flag:
+            if filename in os.listdir(self.directory):
+                print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
+                return
+
+        print(f"Writing {filename}")
+        np.save(self.directory + filename, data.electron_densities)
