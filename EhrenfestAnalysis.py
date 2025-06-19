@@ -3,7 +3,8 @@ from DataHandler import DataHandler
 # imports for type definitions
 from typing import List, Dict
 from DataLoader import Data
-from DataProcessor import DataProcessor, Fit
+from DataProcessor import DataProcessor, Fit, ChargeStateData
+from DataVisualiser import DataVisualiser
 from DataLoader import DataLoader
 
 class EhrenfestAnalysis:
@@ -31,6 +32,11 @@ class EhrenfestAnalysis:
 
         self.data_handlers[old_name].trajectory_name = new_name
         self.data_handlers[new_name] = self.data_handlers[old_name].pop()
+
+    ################
+    # LOADING DATA #
+    ################
+
 
     def load_data(self,
                   trajectory_name: str,
@@ -66,7 +72,9 @@ class EhrenfestAnalysis:
                 data_handler.all_data[energy].electron_densities = all_data_temp[energy].electron_densities
 
 
-
+    #########################
+    # STOPPING POWER THINGS #
+    #########################
 
 
     def calculate_stopping_curve(self,
@@ -101,7 +109,13 @@ class EhrenfestAnalysis:
 
             stopping_power_data[trajectory_name] = {"energies": energies,
                                                     "stopping powers": stopping_powers}
-        self.data_handlers[trajectory_names[0]].data_visualiser.geant4_comparison(stopping_power_data)
+        (self.data_handlers[trajectory_names[0]].data_visualiser.montecarlo_comparison(stopping_power_data))
+
+
+
+    ###########################
+    # ELECTRON DENSITY THINGS #
+    ###########################
 
 
     def visualise_electron_density(self, trajectory_name, energy):
@@ -120,18 +134,20 @@ class EhrenfestAnalysis:
         visualiser.visualise_electron_density(electron_density_list)
 
 
+    def analyse_proton_charge_state(self, trajectory_name, parameters):
+        """
+        data processor calculates the charge state of the proton by summing the electron density around the proton up to a cutoff radius
+        data visualiser plots the proton charge state over time
+        and plots time-averaged charge state for each energy in a given trajectory
+        Parameters:
+            trajectory_name (str)
+            parameters (Dict[str, int])
+        """
+        data_handler: DataHandler = self.data_handlers[trajectory_name]
+        processor: DataProcessor = data_handler.data_processor
+        visualiser: DataVisualiser = data_handler.data_visualiser
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+        charge_state_data_dict: Dict[str, ChargeStateData] = processor.get_electrons_around_proton(data_handler.all_data, parameters)
+        visualiser.plot_charge_state(trajectory_name, charge_state_data_dict, parameters, data_handler.all_data)
+        # visualiser.compare_charge_states(trajectory_names)
 

@@ -2,6 +2,7 @@ import numpy as np
 from DataLoader import Data
 from typing import Dict, List
 
+import matplotlib.pyplot as plt
 
 class Fit:
     """
@@ -14,9 +15,31 @@ class Fit:
         self.cov = cov
         self.crop = crop
 
+class ChargeStateData:
+    def __init__(self, densities, crop, radius, offset=0):
+        """
+        Parameters:
+            densities (np.array)
+            crop (List[int])
+            radius (int)
+            offset (int)
+        """
+        self.densities = densities
+        self.crop = crop
+        self.radius = radius
+        self.offset = offset
 
 
 class DataProcessor:
+    """
+    is really just a collection of methods for processing data
+
+    Methods:
+        calculate_stopping_powers(all_data: Dict[str, Data], crop: List[int | None]) -> Dict[str, Fit]
+            calculates stopping powers by performing a linear fit to (cropped) projectile kinetic energies
+        get_electrons_around_proton(all_data: Dict[str, Data]) -> Dict[str, ChargeStateData]
+            sums electron density in the region of the projectile for analysis of the projectile charge state
+    """
     def __init__(self):
         pass
 
@@ -64,3 +87,71 @@ class DataProcessor:
             fits_information[energy] = fit_info
 
         return fits_information
+
+    def get_electrons_around_proton(self, all_data: Dict[str, Data], parameters: Dict[str, int]):
+        """
+        for each energy simulated for a given trajectory, sums electron density around the projectile position
+        to get the charge state of the projectile over time
+
+        Parameters:
+            all_data (Dict[str, Data])
+            parameters (Dict[str, int])
+
+        Returns:
+            density_dict (Dict[str, ChargeStateData])
+        """
+
+        size = parameters["size"]
+        offset = parameters["offset"]
+        crop_low = parameters["crop_low"]
+        crop_high = parameters["crop_high"]
+
+
+        # size = 10
+        # offset = -3
+
+        charge_state_data_dict = {}
+        for energy, data in all_data.items():
+
+
+            # check that the required data has been loaded in first
+            if data.projectile_positions.size == 0:
+                raise AttributeError(f"projectile positions not loaded for energy {energy}")
+            if data.electron_densities.size == 0:
+                raise AttributeError(f"electron densities not loaded for energy {energy}")
+
+
+            projectile_positions = data.projectile_positions
+            electron_densities = data.electron_densities
+            cell = data.cell
+
+            projectile_position_indices = find_projectile(projectile_positions, electron_densities[0], cell)
+
+            density_around_projectile = []
+            for t, electron_density in enumerate(electron_densities):
+
+                # cutoff to avoid doing this when the projectile crosses the system boundaries
+                if t < crop_low or t > crop_high:
+                    continue
+
+                proj_index = projectile_position_indices[t]
+
+                # TODO: need to modify to make this work with pbc's
+                #   rn I just use a crop in the if statement above to avoid the problem
+                if proj_index[0] + offset < size or proj_index[0] + size + offset > np.shape(electron_densities)[1]:
+                    density_around_projectile.append(None)
+                    continue
+                density_around_projectile.append(np.sum(electron_density[proj_index[0] - size + offset : proj_index[0] + size + offset,
+                                                                                  proj_index[1] - size : proj_index[1] + size,
+                                                                                  proj_index[2] - size : proj_index[2] + size]))
+
+            charge_state_data = ChargeStateData(np.array(density_around_projectile), [crop_low, crop_high], size, offset)
+            charge_state_data_dict[energy] = charge_state_data
+
+        return charge_state_data_dict
+
+
+
+def find_projectile(projectile_positions, electron_density, cell):
+    projectile_position_indices = np.array([(projectile_position % cell) / cell * np.shape(electron_density) for projectile_position in projectile_positions], dtype="int64")
+    return projectile_position_indices

@@ -15,6 +15,7 @@ class Data:
         self.projectile_positions = np.empty((0,3))
         self.projectile_kinetic_energies = np.array([])
         self.electron_densities = None
+        self.cell = None
 
 class DataLoader:
     def __init__(self, directory):
@@ -103,6 +104,8 @@ class DataLoader:
             data = Data()
 
             if not energy in all_csv_files.keys() or force_load_gpw:
+                if not force_load_gpw:
+                    print(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 write_flag = not (energy in all_csv_files.keys())  # only want to write if the csv files don't already exist
                 for filename in all_gpw_files[energy]:
                     atoms, calc = restart(self.directory + filename)
@@ -119,12 +122,22 @@ class DataLoader:
                     # kinetic_energy = 0.5 * projectile_mass * np.sum(projectile_velocities**2) / eV   # Joules -> eV
                     # data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, kinetic_energy)
 
+                    data.cell = np.diag(atoms.get_cell())
+
             else:
                 write_flag = False
                 for filename in all_csv_files[energy]:
-                    df = pd.read_csv(self.directory + filename)
+                    df = pd.read_csv(self.directory + filename, comment="#")
                     data.projectile_positions = df[["projectile x [A]", "projectile y [A]", "projectile z [A]"]].to_numpy()
                     data.projectile_kinetic_energies = df["projectile KE [eV]"].to_numpy()
+
+                    metadata = []
+                    with open(os.path.join(self.directory, filename), "r") as f:
+                        for line in f:
+                            if line.startswith("#"):
+                                metadata.append(line)
+
+                    data.cell = np.fromstring(metadata[1].strip("# cell: ")[1: -2], sep=" ")
 
             if write_flag:
                 self.write_csv(energy, data)
@@ -160,6 +173,18 @@ class DataLoader:
             "projectile z [A]": data.projectile_positions[:, 2],
             "projectile KE [eV]" : data.projectile_kinetic_energies
         }).to_csv(self.directory + filename, index=False)
+
+        # WRITE ADDITIONAL INFORMATION TO THE BOTTOM OF THE CSV FILE
+        # "#" to start the line makes it easy to load with pandas
+        metadata = [
+            "# --- additional info ---",
+            f"# cell: {data.cell}"
+        ]
+
+        with open(os.path.join(self.directory, filename), "a") as f:
+            for line in metadata:
+                f.write(line + "\n")
+
 
 
     def append_to_dict(self, dictionary: Dict[str, List], key, value):
@@ -197,6 +222,7 @@ class DataLoader:
             data = Data()
             electron_densities_temp = []
             if not energy in all_npy_files.keys():
+                print(f"npy not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 write_flag = True
                 for filename in all_gpw_files[energy]:
                     atoms, calc = restart(self.directory + filename)

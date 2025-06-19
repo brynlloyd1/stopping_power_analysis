@@ -139,7 +139,7 @@ class DataVisualiser:
 
         plt.show()
 
-    def geant4_comparison(self, stopping_power_data):
+    def montecarlo_comparison(self, stopping_power_data):
         """
         plots comparison to Monte Carlo stopping curve
 
@@ -240,12 +240,11 @@ class DataVisualiser:
             vmin = slider_vmin.val
             vmax = slider_vmax.val
             if vmin >= vmax:
-                return  # Don't allow inverted color limits
+                return
             im_density.set_clim(vmin, vmax)
             cb_density.update_normal(im_density)
             fig.canvas.draw_idle()
 
-        # Connect sliders
         slider_t.on_changed(update)
         slider_slice.on_changed(update)
         slider_vmin.on_changed(update_vlim)
@@ -256,114 +255,41 @@ class DataVisualiser:
 
 
 
-    # def visualise_electron_density(self, electron_density_list):
-    #     """
-    #     creates animation using matplotlib sliders to display 2d slice of electron density
-    #     has sliders to control slice position, timestep, vmin&vmax
-    #     can also toggle logarithmic plotting
-    #     """
-    #
-    #     shape = np.shape(electron_density_list)
-    #     timesteps = shape[0]
-    #
-    #     # Initial values
-    #     init_timestep = 0
-    #     init_slice = shape[1] // 2
-    #     use_log = False
-    #
-    #     #########################
-    #     # CALCULATE VMIN/VMAX'S #
-    #     #########################
-    #
-    #     all_data = np.stack(electron_density_list)
-    #     vmin_raw = all_data.min()
-    #     vmax_raw = all_data.max()
-    #     log_data = np.log10(np.clip(all_data, 1e-10, None))
-    #     vmin_log = log_data.min()
-    #     vmax_log = log_data.max()
-    #
-    #     ##############
-    #     # SETUP PLOT #
-    #     ##############
-    #
-    #     fig, ax = plt.subplots(figsize=(8, 6))
-    #     plt.subplots_adjust(left=0.25, bottom=0.45)  # Extra room for sliders
-    #
-    #     def get_plot_data(t, slice, log=False):
-    #         data = electron_density_list[t][:, slice, :]
-    #         data = np.rot90(data)
-    #         if log:
-    #             data = np.log10(np.clip(data, 1e-10, None))
-    #         return data
-    #
-    #     # Initial image
-    #     plot_data = get_plot_data(init_timestep, init_slice, use_log)
-    #     im = ax.imshow(plot_data, aspect='auto', vmin=vmin_raw, vmax=vmax_raw)
-    #     cb = fig.colorbar(im, ax=ax)
-    #     title = ax.set_title(f"Timestep: {init_timestep}, Slice: {init_slice}, Log: {use_log}")
-    #
-    #     # Axes for sliders and checkbox
-    #     ax_timestep = plt.axes((0.25, 0.35, 0.65, 0.03))
-    #     ax_slice = plt.axes((0.25, 0.3, 0.65, 0.03))
-    #     ax_vmin = plt.axes((0.25, 0.2, 0.65, 0.03))
-    #     ax_vmax = plt.axes((0.25, 0.15, 0.65, 0.03))
-    #     ax_check = plt.axes((0.05, 0.5, 0.15, 0.1))
-    #
-    #     # Create sliders and checkbox
-    #     slider_timestep = Slider(ax_timestep, 'Timestep', 0, len(electron_density_list) - 1, valinit=init_timestep, valstep=1)
-    #     slider_slice = Slider(ax_slice, 'Slice', 0, shape[1] - 1, valinit=init_slice, valstep=1)
-    #     slider_vmin = Slider(ax_vmin, 'vmin', vmin_raw, vmax_raw, valinit=vmin_raw)
-    #     slider_vmax = Slider(ax_vmax, 'vmax', vmin_raw, vmax_raw, valinit=vmax_raw)
-    #     check = CheckButtons(ax_check, ['Log scale'], [use_log])
-    #
-    #     # update called when a slider is moved
-    #     def update(val):
-    #         t = int(slider_timestep.val)
-    #         s = int(slider_slice.val)
-    #         log_flag = check.get_status()[0]
-    #
-    #         # Determine colour range
-    #         if log_flag:
-    #             current_vmin = slider_vmin.val
-    #             current_vmax = slider_vmax.val
-    #         else:
-    #             current_vmin = slider_vmin.val
-    #             current_vmax = slider_vmax.val
-    #
-    #         # Update data
-    #         new_data = get_plot_data(t, s, log=log_flag)
-    #         im.set_data(new_data)
-    #         im.set_clim(vmin=current_vmin, vmax=current_vmax)
-    #         title.set_text(f"Timestep: {t}, Slice: {s}, Log: {log_flag}")
-    #         fig.canvas.draw_idle()
-    #
-    #     # Log scale toggle — resets vmin/vmax sliders
-    #     def toggle_log(label):
-    #         log_flag = check.get_status()[0]
-    #         if log_flag:
-    #             slider_vmin.valmin = vmin_log
-    #             slider_vmin.valmax = vmax_log
-    #             slider_vmax.valmin = vmin_log
-    #             slider_vmax.valmax = vmax_log
-    #             slider_vmin.set_val(vmin_log)
-    #             slider_vmax.set_val(vmax_log)
-    #         else:
-    #             slider_vmin.valmin = vmin_raw
-    #             slider_vmin.valmax = vmax_raw
-    #             slider_vmax.valmin = vmin_raw
-    #             slider_vmax.valmax = vmax_raw
-    #             slider_vmin.set_val(vmin_raw)
-    #             slider_vmax.set_val(vmax_raw)
-    #         slider_vmin.ax.set_xlim(slider_vmin.valmin, slider_vmin.valmax)
-    #         slider_vmax.ax.set_xlim(slider_vmax.valmin, slider_vmax.valmax)
-    #         update(None)
-    #
-    #     # runs update functions on slider movement
-    #     slider_timestep.on_changed(update)
-    #     slider_slice.on_changed(update)
-    #     slider_vmin.on_changed(update)
-    #     slider_vmax.on_changed(update)
-    #     check.on_clicked(toggle_log)
-    #
-    #     plt.show()
+
+    def plot_charge_state(self, trajectory_name, charge_state_data_dict, parameters, all_data):
+        """
+        plots charge state around the proton for each of the energies simulated for a given trajectory
+        Parameters:
+            trajectory_name (str)
+            charge_state_data_dict (Dict[str, List])
+            parameters (Dict[str, int])
+            all_data (Dict[str, Data])
+        """
+
+        first_data = list(all_data.values())[0]
+        pixel_to_angstrom = first_data.cell[0] / np.shape(first_data.electron_densities)[1]
+
+        fig,axs = plt.subplots(len(charge_state_data_dict.keys()), figsize=(16, 8), sharex="col")
+        fig.subplots_adjust(hspace=0.5)
+        fig.suptitle(f"""Charge state for {trajectory_name} trajectory
+                         (integrated over {parameters["size"] * pixel_to_angstrom:.1f} Angstrom)""")
+        for i, key in enumerate(charge_state_data_dict.keys()):
+
+
+            crop_low, crop_high = charge_state_data_dict[key].crop
+
+            positions = all_data[key].projectile_positions
+            initial_position = positions[0]
+            distance_travelled = np.array([np.linalg.norm(position - initial_position) for position in positions[crop_low : crop_high+1]])
+
+            DFT_HYDROGEN_CHARGE_STATE = 875
+            DFT_HYDROGEN_CHARGE_STATE_RADIUS = 2.2   # Angstroms
+            charge_state = charge_state_data_dict[key].densities / DFT_HYDROGEN_CHARGE_STATE
+
+            axs[i].plot(distance_travelled, charge_state, label=key)
+            axs[i].set_title(key)
+            axs[i].legend()
+        plt.show()
+
+
 
