@@ -1,33 +1,25 @@
 import numpy as np
+
+from dataclasses import field
+# imports for typing
+from typing import Dict, List, Optional
 from DataLoader import Data
-from typing import Dict, List
+from numpy.typing import NDArray
+from dataclasses import dataclass
 
-import matplotlib.pyplot as plt
-
+@dataclass
 class Fit:
-    """
-    class that stored information about fits together
-    stored the fit, the covariance matrix,
-    and how the original data was cropped
-    """
-    def __init__(self, fit, cov, crop):
-        self.fit = fit
-        self.cov = cov
-        self.crop = crop
+    """stores fit, covariance matrix, and how original data was cropped"""
+    fit: NDArray[np.float64]
+    cov: NDArray[np.float64]
+    crop: List[int | None]
 
+@dataclass
 class ChargeStateData:
-    def __init__(self, densities, crop, radius, offset=0):
-        """
-        Parameters:
-            densities (np.array)
-            crop (List[int])
-            radius (int)
-            offset (int)
-        """
-        self.densities = densities
-        self.crop = crop
-        self.radius = radius
-        self.offset = offset
+    density_around_projectile: NDArray[np.float64]
+    crop: List[int | None]
+    radius: int
+    offset: int
 
 
 class DataProcessor:
@@ -40,12 +32,10 @@ class DataProcessor:
         get_electrons_around_proton(all_data: Dict[str, Data]) -> Dict[str, ChargeStateData]
             sums electron density in the region of the projectile for analysis of the projectile charge state
     """
-    def __init__(self):
-        pass
 
-    def calculate_stopping_powers(self,
-                                  all_data: Dict[str, Data],
-                                  crop: List[int | None] = [None, None]):
+    @staticmethod
+    def calculate_stopping_powers(all_data: Dict[str, Data],
+                                  crop: List[int | None] = [None, None]) -> Dict[str, Fit]:
         """
         performs linear fits to kinetic energy data to extract averaged stopping powers
         Parameters:
@@ -55,7 +45,9 @@ class DataProcessor:
         Returns:
             fits_information (Dict[str, Fit])
         """
-        items = all_data.items()
+
+        # replaced crop: List[int | None] = [None, None] (in case it breaks)
+
         projectile_positions = {key: value.projectile_positions for key,value in all_data.items()}
         projectile_kinetic_energies = {key: value.projectile_kinetic_energies for key,value in all_data.items()}
 
@@ -88,7 +80,9 @@ class DataProcessor:
 
         return fits_information
 
-    def get_electrons_around_proton(self, all_data: Dict[str, Data], parameters: Dict[str, int]):
+    @staticmethod
+    def get_electrons_around_proton(all_data: Dict[str, Data],
+                                    parameters: Dict[str, int]) -> Dict[str, ChargeStateData]:
         """
         for each energy simulated for a given trajectory, sums electron density around the projectile position
         to get the charge state of the projectile over time
@@ -125,7 +119,7 @@ class DataProcessor:
             electron_densities = data.electron_densities
             cell = data.cell
 
-            projectile_position_indices = find_projectile(projectile_positions, electron_densities[0], cell)
+            projectile_position_indices = DataProcessor.find_projectile(projectile_positions, electron_densities[0], cell)
 
             density_around_projectile = []
             for t, electron_density in enumerate(electron_densities):
@@ -151,7 +145,9 @@ class DataProcessor:
         return charge_state_data_dict
 
 
-
-def find_projectile(projectile_positions, electron_density, cell):
-    projectile_position_indices = np.array([(projectile_position % cell) / cell * np.shape(electron_density) for projectile_position in projectile_positions], dtype="int64")
-    return projectile_position_indices
+    @staticmethod
+    def find_projectile(projectile_positions: NDArray[np.float64],
+                        electron_density: NDArray[np.float64],
+                        cell: NDArray[np.float64]) -> NDArray[np.float64]:
+        projectile_position_indices = np.array([(projectile_position % cell) / cell * np.shape(electron_density) for projectile_position in projectile_positions], dtype="int64")
+        return projectile_position_indices

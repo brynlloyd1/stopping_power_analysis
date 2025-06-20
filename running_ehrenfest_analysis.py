@@ -1,35 +1,59 @@
 from EhrenfestAnalysis import EhrenfestAnalysis
 
+from logger_config import setup_logging
+import logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
+logger.info("Starting Ehrenfest Analysis")
+
+
+
 analysis = EhrenfestAnalysis()
+
+
+
+# directory_322_hyperchannelling_hydrogen = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/322_hyperchannelling_hydrogen/"
+# name_322_hyperchannelling_hydrogen = analysis.initialise_analysis(directory_322_hyperchannelling_hydrogen)
+# analysis.load_data(name_322_hyperchannelling_hydrogen)
+
+
+
+
 
 directory_622_hyperchannelling_proton = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/622_hyperchannelling_proton/"
 name_622_hyperchannelling_proton = analysis.initialise_analysis(directory_622_hyperchannelling_proton)
 analysis.load_data(name_622_hyperchannelling_proton)
-analysis.load_densities(name_622_hyperchannelling_proton)
-
-
+# # analysis.load_densities(name_622_hyperchannelling_proton)
+#
+#
 directory_622_hyperchannelling_hydrogen = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/622_hyperchannelling_hydrogen/"
 name_622_hyperchannelling_hydrogen = analysis.initialise_analysis(directory_622_hyperchannelling_hydrogen)
 analysis.load_data(name_622_hyperchannelling_hydrogen)
-analysis.load_densities(name_622_hyperchannelling_hydrogen)
+# # analysis.load_densities(name_622_hyperchannelling_hydrogen)
+#
+#
+directory_322_presampled1_hydrogen = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/322_presampled1_hydrogen/"
+name_322_presampled1_hydrogen = analysis.initialise_analysis(directory_322_presampled1_hydrogen)
+analysis.load_data(name_322_presampled1_hydrogen)
+#
+# parameters = {
+#     "size" : 5,
+#     "offset" : 0,
+#     "crop_low" : 4,
+#     "crop_high" : 64,
+# }
+#
+# # analysis.analyse_proton_charge_state(name_622_hyperchannelling_hydrogen, parameters)
+# # analysis.analyse_proton_charge_state(name_622_hyperchannelling_proton, parameters)
+#
+analysis.calculate_stopping_curve(name_622_hyperchannelling_hydrogen)
+analysis.calculate_stopping_curve(name_622_hyperchannelling_proton)
+analysis.calculate_stopping_curve(name_322_presampled1_hydrogen)
+analysis.compare_to_montecarlo([name_622_hyperchannelling_hydrogen, name_622_hyperchannelling_proton, name_322_presampled1_hydrogen])
+#
 
-
-parameters = {
-    "size" : 5,
-    "offset" : 0,
-    "crop_low" : 4,
-    "crop_high" : 64,
-}
-
-analysis.analyse_proton_charge_state(name_622_hyperchannelling_hydrogen, parameters)
-analysis.analyse_proton_charge_state(name_622_hyperchannelling_proton, parameters)
-
-# analysis.calculate_stopping_curve(name_622_hyperchannelling_hydrogen)
-# analysis.calculate_stopping_curve(name_622_hyperchannelling_proton)
-# analysis.view_fits(name_622_hyperchannelling_proton)
-# analysis.compare_to_montecarlo([name_622_hyperchannelling_hydrogen, name_622_hyperchannelling_proton])
-
-
+# =====================================================================================================================================
 #
 # def find_projectile(projectile_positions, electron_density, cell):
 #     projectile_position_indices = np.array([(projectile_position % cell) / cell * np.shape(electron_density) for projectile_position in projectile_positions], dtype="int64")

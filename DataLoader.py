@@ -1,21 +1,33 @@
 from gpaw import restart
-from ase.units import eV, _amu
+# from ase.units import eV, _amu
 
 import numpy as np
 import pandas as pd
 
+import logging
 import os
 import re
-from typing import Dict, List
 
+# imports for typing
+from typing import Dict, List, Any
+from numpy.typing import NDArray
+from ase import Atoms
+from gpaw import GPAW
+from dataclasses import dataclass, field
+
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
 class Data:
-    def __init__(self):
-        self.atoms_list = []
-        self.calc_list = []
-        self.projectile_positions = np.empty((0,3))
-        self.projectile_kinetic_energies = np.array([])
-        self.electron_densities = None
-        self.cell = None
+    # needs default values because some attributes will be left empty, depending on which data is being loaded
+    atoms_list: List[Atoms] = field(default_factory=list)
+    calc_list: List[GPAW] = field(default_factory=list)
+    projectile_positions: NDArray[np.float64] = field(default_factory = lambda: np.empty((0,3)))
+    projectile_kinetic_energies: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
+    electron_densities: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
+    cell: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
 
 class DataLoader:
     def __init__(self, directory):
@@ -31,7 +43,7 @@ class DataLoader:
         self._energy_timestep_regex_pattern = re.compile(r"(\d+)k_step(\d+)")
 
 
-    def get_files(self, kind):
+    def get_files(self, kind: str) -> Dict[str, str]:
         """
         returns a dictionary of all files of a given type, separated by their energies
 
@@ -77,7 +89,7 @@ class DataLoader:
 
         return filename_dict
 
-    def load_data(self, force_load_gpw=False):
+    def load_data(self, force_load_gpw: bool = False) -> Dict[str, Data]:
         """
         If .csv files exist, loads position and kinetic energy data from them
         if not, uses gpaw.restart to load in atoms, calc
@@ -97,16 +109,18 @@ class DataLoader:
         if self.which_energies == ["all"]:
             self.which_energies = all_gpw_files.keys()
 
-        all_data = {}
+        all_data: Dict[str, Data] = {}
         for energy in self.which_energies:
             write_flag = False
 
             data = Data()
 
-            if not energy in all_csv_files.keys() or force_load_gpw:
+            if energy not in all_csv_files.keys() or force_load_gpw:
                 if not force_load_gpw:
-                    print(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
+                    # print(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
+                    logger.info(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 write_flag = not (energy in all_csv_files.keys())  # only want to write if the csv files don't already exist
+
                 for filename in all_gpw_files[energy]:
                     atoms, calc = restart(self.directory + filename)
                     data.atoms_list.append(atoms)
@@ -131,12 +145,8 @@ class DataLoader:
                     data.projectile_positions = df[["projectile x [A]", "projectile y [A]", "projectile z [A]"]].to_numpy()
                     data.projectile_kinetic_energies = df["projectile KE [eV]"].to_numpy()
 
-                    metadata = []
-                    with open(os.path.join(self.directory, filename), "r") as f:
-                        for line in f:
-                            if line.startswith("#"):
-                                metadata.append(line)
-
+                    metadata = self.read_metadata(filename)
+                    # from DataLoader.write_csv, the second line will contain information about Atoms.cell()
                     data.cell = np.fromstring(metadata[1].strip("# cell: ")[1: -2], sep=" ")
 
             if write_flag:
@@ -147,7 +157,7 @@ class DataLoader:
 
         return all_data
 
-    def write_csv(self, energy, data, overwrite_flag = False):
+    def write_csv(self, energy: str, data: Data, overwrite_flag: bool = False):
         """
         writes projectile positions and kinetic energies to a csv file
 
@@ -160,10 +170,12 @@ class DataLoader:
         filename = f"Al_stopping_{energy.rstrip(' keV')}k.csv"
         if not overwrite_flag:
             if filename in os.listdir(self.directory):
-                print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
+                # print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
+                logger.info(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
                 return
 
-        print(f"Writing {filename}")
+        # print(f"Writing {filename}")
+        logger.info(f"Writing {filename}")
 
         timesteps = list(range(1, len(data.projectile_positions) + 1))
         df = pd.DataFrame(data = {
@@ -185,19 +197,34 @@ class DataLoader:
             for line in metadata:
                 f.write(line + "\n")
 
+    def read_metadata(self, filename: str) -> List[str]:
+        """
+        Parameters:
+            path_to_csv_file (str)
+        Returns:
+            metadata (List[str])
+        """
+        metadata = []
+        with open(os.path.join(self.directory, filename), "r") as f:
+            for line in f:
+                if line.startswith("#"):
+                    metadata.append(line)
+
+        return metadata
 
 
-    def append_to_dict(self, dictionary: Dict[str, List], key, value):
+    @staticmethod
+    def append_to_dict(dictionary: Dict[str, List], key: str, value: List[Any]) -> Dict[str, List]:
         """
         appends to a dictionary, where the value is a list of elements
 
         Parameters:
             dictionary (dict[str, __])
             key (str)
-            value (list)
+            value (List[Any])
 
         Returns:
-            dictionary (dict[str, __])
+            dictionary (dict[str, List[Any]])
         """
 
         if key not in dictionary:
@@ -208,7 +235,7 @@ class DataLoader:
         return dictionary
 
 
-    def load_densities(self):
+    def load_densities(self) -> Dict[str, Data]:
         all_gpw_files = self.get_files("gpw")
         all_npy_files = self.get_files("npy")
 
@@ -222,7 +249,8 @@ class DataLoader:
             data = Data()
             electron_densities_temp = []
             if not energy in all_npy_files.keys():
-                print(f"npy not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
+                # print(f"npy not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
+                logger.info(f"npy not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 write_flag = True
                 for filename in all_gpw_files[energy]:
                     atoms, calc = restart(self.directory + filename)
@@ -244,7 +272,7 @@ class DataLoader:
 
         return all_data
 
-    def write_npy(self, energy, data, overwrite_flag = False):
+    def write_npy(self, energy: str, data: Data, overwrite_flag: bool = False):
         """
         writes electron densities to a npy file
 
@@ -256,8 +284,10 @@ class DataLoader:
         filename = f"Al_stopping_{energy.rstrip(' keV')}k.npy"
         if not overwrite_flag:
             if filename in os.listdir(self.directory):
-                print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
+                # print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
+                logger.info(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
                 return
 
-        print(f"Writing {filename}")
+        # print(f"Writing {filename}")
+        logger.info(f"Writing {filename}")
         np.save(self.directory + filename, data.electron_densities)

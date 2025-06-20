@@ -1,11 +1,16 @@
 from DataHandler import DataHandler
 
-# imports for type definitions
-from typing import List, Dict
+from dataclasses import field
+# imports for typing
+from typing import List, Dict, Optional
 from DataLoader import Data
 from DataProcessor import DataProcessor, Fit, ChargeStateData
 from DataVisualiser import DataVisualiser
 from DataLoader import DataLoader
+
+import logging
+
+logging.getLogger(__name__)
 
 class EhrenfestAnalysis:
     def __init__(self):
@@ -28,7 +33,9 @@ class EhrenfestAnalysis:
     def set_name(self, old_name: str, new_name: str):
         """changes the name of a trajectory, which is stored by the DataHandler instance"""
         if new_name in self.data_handlers.keys():
-            raise KeyError(f"{new_name} already exists")
+            logging.warning(f"The name {new_name} already exists, returning without overwriting")
+            # raise KeyError(f"{new_name} already exists")
+            return
 
         self.data_handlers[old_name].trajectory_name = new_name
         self.data_handlers[new_name] = self.data_handlers[old_name].pop()
@@ -51,7 +58,7 @@ class EhrenfestAnalysis:
 
         data_handler: DataHandler = self.data_handlers[trajectory_name]
         # data_handler.atoms_dict, data_handler.calc_dict = data_handler.data_loader.load_data()
-        data_handler.all_data = data_handler.data_loader.load_data()
+        data_handler.all_data = data_handler.data_loader.load_data(force_load_gpw)
 
     def load_densities(self,
                        trajectory_name: str):
@@ -81,6 +88,7 @@ class EhrenfestAnalysis:
                                  trajectory_name: str,
                                  crop: List[int | None] = [11, None]):
         """tells the DataProcessor instance to perform fits to kinetic energy data"""
+
         handler: DataHandler = self.data_handlers[trajectory_name]
         processor: DataProcessor = handler.data_processor
         # fits_information = processor.calculate_stopping_powers(handler.atoms_dict, crop=crop)
@@ -92,24 +100,13 @@ class EhrenfestAnalysis:
         handler = self.data_handlers[trajectory_name]
         visualiser = handler.data_visualiser
         visualiser.plot_all_fits(handler.all_data, handler.fits)
-        # visualiser.plot_all_fits(handler.atoms_dict, handler.fits)
 
 
-    def compare_to_montecarlo(self, trajectory_names):
-        """comparison of a stopping curve to Monte Carlo stopping power curve"""
-        stopping_power_data = {}
-        for trajectory_name in trajectory_names:
-            handler = self.data_handlers[trajectory_name]
-            energies = []
-            stopping_powers = []
+    def compare_to_montecarlo(self, trajectory_names: List[str]):
+        """creates a dictionary of trajectory_name : fits for that trajectory, and passes to visualiser"""
 
-            for energy, fit_info in handler.fits.items():
-                energies.append(int(energy.rstrip(" keV")))
-                stopping_powers.append(-fit_info.fit[0]*1e3)   # fit[0] is in keV/Angstrom. convert to eV/Ang
-
-            stopping_power_data[trajectory_name] = {"energies": energies,
-                                                    "stopping powers": stopping_powers}
-        (self.data_handlers[trajectory_names[0]].data_visualiser.montecarlo_comparison(stopping_power_data))
+        all_fit_info = {trajectory_name: self.data_handlers[trajectory_name].fits for trajectory_name in trajectory_names}
+        self.data_handlers[trajectory_names[0]].data_visualiser.montecarlo_comparison(all_fit_info)
 
 
 
@@ -118,7 +115,7 @@ class EhrenfestAnalysis:
     ###########################
 
 
-    def visualise_electron_density(self, trajectory_name, energy):
+    def visualise_electron_density(self, trajectory_name: str, energy: str):
         """DataVisualiser.visualise_electron_density called"""
 
         handler = self.data_handlers[trajectory_name]

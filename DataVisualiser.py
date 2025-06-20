@@ -3,8 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
-from DataLoader import Data
+# imports for typing
 from typing import Dict
+from DataLoader import Data
+from DataProcessor import Fit
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DataVisualiser:
@@ -21,7 +27,7 @@ class DataVisualiser:
     # FOR PLOTTING STOPPING POWER ANALYSIS #
     ########################################
 
-    def load_srim(self, path):
+    def load_srim(self, path: str) -> pd.DataFrame:
         raw_data = pd.read_csv(path,
                                sep=r"\s+",
                                skiprows = 23,
@@ -29,16 +35,16 @@ class DataVisualiser:
                                skipfooter=14,
                                engine="python")
 
-        data = pd.DataFrame(data = {
+        data_df = pd.DataFrame(data = {
             "E_k [keV]" : raw_data[0],
             "S_e [eV/A]" : raw_data[2],
             "S_n [eV/A]" : raw_data[3],
             "S [eV/A]" : raw_data[2] + raw_data[3]
         })
 
-        data.loc[0, "E_k [keV]"] /= 1e3   # just this first one is in eV??
+        data_df.loc[0, "E_k [keV]"] /= 1e3   # just this first one is in eV??
 
-        return data
+        return data_df
 
     def plot_all_fits(self, all_data: Dict[str, Data], fits):
 
@@ -94,7 +100,8 @@ class DataVisualiser:
                     pfit = np.poly1d([-1e-3*self.geant4_stopping_data["stopping powers"][index][0], self.geant4_stopping_data["energies"][index][0]])
                     axs[i, 0].plot(distance_travelled, pfit(distance_travelled), label=rf"Geant4: $S_e$ = {self.geant4_stopping_data['stopping powers'][index][0]:.1f} [eV/$\AA$]")
                 except:
-                    print(f"no geant4 fit for {energy}")
+                    # print(f"no geant4 fit for {energy}")
+                    logger.info(f"no geant4 fit for {energy}")
 
 
             # TODO: WONT FIND ANYTHING AT ALL
@@ -105,7 +112,8 @@ class DataVisualiser:
                     p = np.poly1d(-1e-3 * self.srim_stopping_data.loc[index, "S [ev/A]"], self.srim_stopping_data.loc[index, "E_k [keV]"])
                     axs[i, 0].plot(distance_travelled, p(distance_travelled)) #, label=rf"SRIM: S = {self.}"
                 except:
-                    print(f"no srim fit for {energy}")
+                    # print(f"no srim fit for {energy}")
+                    logging.info(f"no srim fit for {energy}")
 
             ########################
             # PLOT STOPPING FITS?? #
@@ -139,21 +147,29 @@ class DataVisualiser:
 
         plt.show()
 
-    def montecarlo_comparison(self, stopping_power_data):
+    # def montecarlo_comparison(self, stopping_power_data):
+    def montecarlo_comparison(self, all_fit_info: Dict[str, Dict[str, Fit]]):
+
         """
         plots comparison to Monte Carlo stopping curve
 
         Parameters:
         stopping_power_data (Dict[str, np.ndarray()])
         """
+        # TODO: change parameters stopping_power_data to a Fit instance or something idk
         fig,ax = plt.subplots(figsize=(15,5))
         ax.set_xlabel("projectile initial kinetic energy [keV]")
         ax.set_ylabel(r"stopping power [eV/$\AA$]")
 
         # ax.plot(self.geant4_stopping_data["energies"], self.geant4_stopping_data["stopping powers"], "-", label="GEANT4")
+
         ax.plot(self.srim_stopping_data["E_k [keV]"], self.srim_stopping_data["S [eV/A]"], label="SRIM")
-        for trajectory_name, trajectory in stopping_power_data.items():
-            ax.plot(trajectory["energies"], trajectory["stopping powers"], "-x", label=trajectory_name)
+
+        for trajectory_name, fit_info in all_fit_info.items():
+            energies = [int(energy_string.rstrip(" keV")) for energy_string in list(fit_info.keys())]
+            # stopping_powers = -1e3 * fit_info.fit[0]   # want to plot in eV/Ang
+            stopping_powers = [-1e3 * fit.fit[0] for fit in fit_info.values()]
+            ax.plot(energies, stopping_powers, "-x", label=trajectory_name)
         ax.legend()
         plt.show()
 
@@ -282,11 +298,15 @@ class DataVisualiser:
             initial_position = positions[0]
             distance_travelled = np.array([np.linalg.norm(position - initial_position) for position in positions[crop_low : crop_high+1]])
 
-            DFT_HYDROGEN_CHARGE_STATE = 875
-            DFT_HYDROGEN_CHARGE_STATE_RADIUS = 2.2   # Angstroms
-            charge_state = charge_state_data_dict[key].densities / DFT_HYDROGEN_CHARGE_STATE
+            # GOTTEN FROM A DFT SIMULATION OF A SINGLE HYDROGEN ATOM
+            # IDK WHERE TO PUT THEM...
+            DFT_HYDROGEN_CHARGE_STATE = 875   # 99% of electron density
+            DFT_HYDROGEN_CHARGE_STATE_RADIUS = 2.2   # radius [Angstroms] which contains 99% of hydrogen's electron density
+
+            charge_state = charge_state_data_dict[key].density_around_projectile / DFT_HYDROGEN_CHARGE_STATE
 
             axs[i].plot(distance_travelled, charge_state, label=key)
+            axs[i].axhline(np.mean(charge_state), linestyle = "--", color="red", label=f"average charge state = {np.mean(charge_state):.2f}")
             axs[i].set_title(key)
             axs[i].legend()
         plt.show()
