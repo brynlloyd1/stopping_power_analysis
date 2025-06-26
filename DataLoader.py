@@ -24,8 +24,10 @@ class Data:
     # needs default values because some attributes will be left empty, depending on which data is being loaded
     atoms_list: List[Atoms] = field(default_factory=list)
     calc_list: List[GPAW] = field(default_factory=list)
+
     projectile_positions: NDArray[np.float64] = field(default_factory = lambda: np.empty((0,3)))
     projectile_kinetic_energies: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
+
     electron_densities: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
     cell: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
 
@@ -45,6 +47,8 @@ class DataLoader:
         # tells gpaw where to look for the custom setups that are sometimes used
         setup_paths.insert(0, "./")
 
+        self.stopping_data_loaded: bool = False
+        self.density_data_loaded: bool = False
 
     def get_files(self, kind: str) -> Dict[str, str]:
         """
@@ -120,7 +124,6 @@ class DataLoader:
 
             if energy not in all_csv_files.keys() or force_load_gpw:
                 if not force_load_gpw:
-                    # print(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                     logger.info(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 write_flag = not (energy in all_csv_files.keys())  # only want to write if the csv files don't already exist
 
@@ -158,6 +161,7 @@ class DataLoader:
             # all_data = self.append_to_dict(all_data, energy, data)
             all_data[energy] = data
 
+        self.stopping_data_loaded = True
         return all_data
 
     def write_csv(self, energy: str, data: Data, overwrite_flag: bool = False):
@@ -173,11 +177,9 @@ class DataLoader:
         filename = f"Al_stopping_{energy.rstrip(' keV')}k.csv"
         if not overwrite_flag:
             if filename in os.listdir(self.directory):
-                # print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
                 logger.info(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
                 return
 
-        # print(f"Writing {filename}")
         logger.info(f"Writing {filename}")
 
         timesteps = list(range(1, len(data.projectile_positions) + 1))
@@ -252,7 +254,6 @@ class DataLoader:
             data = Data()
             electron_densities_temp = []
             if not energy in all_npy_files.keys():
-                # print(f"npy not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 logger.info(f"npy not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
                 write_flag = True
                 for filename in all_gpw_files[energy]:
@@ -273,6 +274,7 @@ class DataLoader:
 
             all_data[energy] = data
 
+        self.density_data_loaded = True
         return all_data
 
     def write_npy(self, energy: str, data: Data, overwrite_flag: bool = False):
@@ -287,10 +289,8 @@ class DataLoader:
         filename = f"Al_stopping_{energy.rstrip(' keV')}k.npy"
         if not overwrite_flag:
             if filename in os.listdir(self.directory):
-                # print(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
                 logger.info(f"File {filename} already exists, must specify overwrite_flag = True to overwrite.")
                 return
 
-        # print(f"Writing {filename}")
         logger.info(f"Writing {filename}")
         np.save(self.directory + filename, data.electron_densities)

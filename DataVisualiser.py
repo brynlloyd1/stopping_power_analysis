@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
+import utils
+
 # imports for typing
 from typing import Dict
 from DataLoader import Data
@@ -35,6 +37,19 @@ class DataVisualiser:
                                skipfooter=14,
                                engine="python")
 
+        for i, unit in enumerate(raw_data[1].to_numpy()):
+            multiply_by = 1.0  # for converting to keV
+            if unit == "eV":
+                multiply_by = 1.0e-3
+            elif unit == "keV":
+                pass
+            elif unit == "MeV":
+                multiply_by = 1.0e3
+            else:
+                raise ValueError("Error reading units in SRIM file")
+
+            raw_data.loc[i, 0] *= multiply_by
+
         data_df = pd.DataFrame(data = {
             "E_k [keV]" : raw_data[0],
             "S_e [eV/A]" : raw_data[2],
@@ -42,7 +57,8 @@ class DataVisualiser:
             "S [eV/A]" : raw_data[2] + raw_data[3]
         })
 
-        data_df.loc[0, "E_k [keV]"] /= 1e3   # just this first one is in eV??
+        # rounds energy column to 3sf so that it is much easier to search through
+        data_df["E_k [keV]"] = np.array([utils.round_sf(x) for x in data_df["E_k [keV]"].to_numpy()])
 
         return data_df
 
@@ -93,27 +109,31 @@ class DataVisualiser:
             ######################
             # PLOT GEANT4 DATA?? #
             ######################
-            plot_geant4_stopping = True
+            plot_geant4_stopping = False
             if plot_geant4_stopping:
                 try:
                     index = np.where(self.geant4_stopping_data["energies"] == int(energy.rstrip(" keV")))[0]
                     pfit = np.poly1d([-1e-3*self.geant4_stopping_data["stopping powers"][index][0], self.geant4_stopping_data["energies"][index][0]])
                     axs[i, 0].plot(distance_travelled, pfit(distance_travelled), label=rf"Geant4: $S_e$ = {self.geant4_stopping_data['stopping powers'][index][0]:.1f} [eV/$\AA$]")
                 except:
-                    # print(f"no geant4 fit for {energy}")
                     logger.info(f"no geant4 fit for {energy}")
 
 
             # TODO: WONT FIND ANYTHING AT ALL
-            plot_srim_stopping = False
+            plot_srim_stopping = True
             if plot_srim_stopping:
                 try:
-                    index = self.srim_stopping_data[np.isclose(self.srim_stopping_data["E_k [keV]"], energy.rstrip(" keV"))]
-                    p = np.poly1d(-1e-3 * self.srim_stopping_data.loc[index, "S [ev/A]"], self.srim_stopping_data.loc[index, "E_k [keV]"])
-                    axs[i, 0].plot(distance_travelled, p(distance_travelled)) #, label=rf"SRIM: S = {self.}"
-                except:
-                    # print(f"no srim fit for {energy}")
-                    logging.info(f"no srim fit for {energy}")
+                    energy_val = utils.round_sf(float(energy.rstrip(" keV")))
+                    row = self.srim_stopping_data.loc[self.srim_stopping_data["E_k [keV]"] == energy_val]
+                    stopping_power_SRIM = row["S [eV/A]"].values[0]
+                    energy_SRIM = row["E_k [keV]"].values[0]
+
+                    p = np.poly1d([-1e-3 * stopping_power_SRIM, energy_SRIM])
+                    axs[i, 0].plot(distance_travelled, p(distance_travelled), label=rf"SRIM: S = {stopping_power_SRIM:.1f} [eV/$\AA$]")
+                    axs[i, 1].axhline(1e-3 * stopping_power_SRIM, color="C1", label=rf"SRIM: S = {stopping_power_SRIM:.1f} [eV/$\AA$]")
+
+                except Exception as e:
+                    logging.warn(f"no srim fit for {energy}, error: {e}")
 
             ########################
             # PLOT STOPPING FITS?? #
@@ -137,13 +157,14 @@ class DataVisualiser:
                 axs[i, 1].plot([distance_travelled[0], distance_travelled[-1]], [-fit[0], -fit[0]], color="red")
                 axs[i, 1].fill_between(distance_travelled, np.ones(len(distance_travelled))*-fit[0] - stopping_power_uncertainty,
                                                         np.ones(len(distance_travelled))*-fit[0] + stopping_power_uncertainty,
-                                                        color="red", alpha=0.25)
+                                                        color="red", alpha=0.25, label=label)
 
                 # plot points used in the fitting
                 n_timesteps = len(distance_travelled)
                 axs[i, 0].plot(distance_travelled[crop[0]:n_timesteps - (crop[1] or 0)], kinetic_energies[crop[0]:n_timesteps - (crop[1] or 0)], "x", color="red")
                 axs[i, 1].plot(distance_travelled[crop[0] : n_timesteps - (crop[1] or 0) - 1], -np.diff(kinetic_energies)[crop[0] : n_timesteps - (crop[1] or 0) - 1]/np.diff(distance_travelled)[crop[0] : n_timesteps - (crop[1] or 0) - 1], "x", color="red")
-                axs[i,0].legend()
+                axs[i, 0].legend()
+                axs[i, 1].legend()
 
         plt.show()
 
@@ -272,7 +293,7 @@ class DataVisualiser:
 
 
 
-    def plot_charge_state(self, trajectory_name, charge_state_data_dict, parameters, all_data):
+    def plot_charge_state(self, trajectory_name, charge_state_data_dict, parameters, all_data, single_plot = False):
         """
         plots charge state around the proton for each of the energies simulated for a given trajectory
         Parameters:
@@ -308,10 +329,12 @@ class DataVisualiser:
             charge_state = charge_state_data_dict[key].density_around_projectile / DFT_HYDROGEN_CHARGE_STATE
 
             axs[i].plot(distance_travelled, charge_state, label=key)
-            axs[i].axhline(np.mean(charge_state), linestyle = "--", color="red", label=f"average charge state = {np.mean(charge_state):.2f}")
+            # axs[i].axhline(np.mean(charge_state), linestyle = "--", color="red", label=f"average charge state = {np.mean(charge_state):.2f}")
             axs[i].set_title(key)
             axs[i].legend()
         plt.show()
+
+
 
 
 

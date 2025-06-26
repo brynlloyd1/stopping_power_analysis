@@ -1,3 +1,5 @@
+from unittest import loader
+
 from DataHandler import DataHandler
 
 from dataclasses import field
@@ -98,6 +100,10 @@ class EhrenfestAnalysis:
         """tells the DataProcessor instance to perform fits to kinetic energy data"""
 
         handler: DataHandler = self.data_handlers[trajectory_name]
+
+        if not handler.data_loader.stopping_data_loaded:
+            self.load_data(trajectory_name)
+
         processor: DataProcessor = handler.data_processor
         # fits_information = processor.calculate_stopping_powers(handler.atoms_dict, crop=crop)
         handler.fits = processor.calculate_stopping_powers(handler.all_data, crop=crop)
@@ -106,6 +112,12 @@ class EhrenfestAnalysis:
     def view_fits(self, trajectory_name: str):
         """plots data and fits which comparison to Monte Carlo stopping powers"""
         handler = self.data_handlers[trajectory_name]
+        loader = handler.data_loader
+        if not loader.stopping_data_loaded:
+            loader.load_data()
+
+
+
         visualiser = handler.data_visualiser
         visualiser.plot_all_fits(trajectory_name, handler.all_data, handler.fits)
 
@@ -132,8 +144,11 @@ class EhrenfestAnalysis:
 
         # TODO: NEED TO CHECK FOR ELECTRON DENSITIES
         # this doesnt work if showing electron densities in the first thing you do bc all_data has no keys
-        if handler.all_data[energy].electron_densities is None:
-            loader.load_densities()
+        # if handler.all_data[energy].electron_densities is None:
+        #     loader.load_densities()
+
+        if not loader.density_data_loaded:
+            self.load_densities(trajectory_name)
 
         electron_density_list = handler.all_data[energy].electron_densities
         visualiser.visualise_electron_density(electron_density_list)
@@ -151,6 +166,11 @@ class EhrenfestAnalysis:
         data_handler: DataHandler = self.data_handlers[trajectory_name]
         processor: DataProcessor = data_handler.data_processor
         visualiser: DataVisualiser = data_handler.data_visualiser
+
+        if not data_handler.data_loader.stopping_data_loaded:
+            self.load_data(trajectory_name)
+        if not data_handler.data_loader.density_data_loaded:
+            self.load_densities(trajectory_name)
 
         charge_state_data_dict: Dict[str, ChargeStateData] = processor.get_electrons_around_proton(data_handler.all_data, parameters)
         visualiser.plot_charge_state(trajectory_name, charge_state_data_dict, parameters, data_handler.all_data)
