@@ -79,6 +79,14 @@ class EhrenfestAnalysis:
                 data_handler.all_data[energy].electron_densities = all_data_temp[energy].electron_densities
 
 
+
+    def set_which_energies(self, trajectory_name: str, which_energies: List[str]):
+        data_handler: DataHandler = self.data_handlers[trajectory_name]
+        data_loader = data_handler.data_loader
+        data_loader.which_energies = which_energies
+
+
+
     #########################
     # STOPPING POWER THINGS #
     #########################
@@ -99,7 +107,7 @@ class EhrenfestAnalysis:
         """plots data and fits which comparison to Monte Carlo stopping powers"""
         handler = self.data_handlers[trajectory_name]
         visualiser = handler.data_visualiser
-        visualiser.plot_all_fits(handler.all_data, handler.fits)
+        visualiser.plot_all_fits(trajectory_name, handler.all_data, handler.fits)
 
 
     def compare_to_montecarlo(self, trajectory_names: List[str]):

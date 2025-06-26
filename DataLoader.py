@@ -1,4 +1,4 @@
-from gpaw import restart
+from gpaw import restart, setup_paths
 # from ase.units import eV, _amu
 
 import numpy as np
@@ -41,6 +41,9 @@ class DataLoader:
         self._energy_regex_pattern = re.compile(r"(\d+)k")
         self._timestep_regex_pattern = re.compile(r"k_step(\d+)")
         self._energy_timestep_regex_pattern = re.compile(r"(\d+)k_step(\d+)")
+
+        # tells gpaw where to look for the custom setups that are sometimes used
+        setup_paths.insert(0, "./")
 
 
     def get_files(self, kind: str) -> Dict[str, str]:

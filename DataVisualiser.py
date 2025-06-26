@@ -46,7 +46,7 @@ class DataVisualiser:
 
         return data_df
 
-    def plot_all_fits(self, all_data: Dict[str, Data], fits):
+    def plot_all_fits(self, trajectory_name: str, all_data: Dict[str, Data], fits):
 
         """
         for every projectile energy, creates 2 subplots
@@ -65,7 +65,7 @@ class DataVisualiser:
         fig,axs = plt.subplots(n_subplots, 2, figsize=(15, 5*n_subplots), sharex="col")
         if n_subplots == 1:
             axs = np.array([axs])
-        fig.suptitle("Stopping Power Things")
+        fig.suptitle(f"Stopping Power Fits for {trajectory_name}")
         _ = [ax.set_ylabel("Kinetic Energy [keV]") for ax in axs[:,0]]
         _ = [ax.set_ylabel(r"$\frac{dKE}{dx}$ [keV/$\AA$]") for ax in axs[:,1]]
         _ = [ax.set_xlabel(r"Projectile Position [$\AA$]") for ax in axs[n_subplots-1]]
@@ -286,6 +286,8 @@ class DataVisualiser:
         pixel_to_angstrom = first_data.cell[0] / np.shape(first_data.electron_densities)[1]
 
         fig,axs = plt.subplots(len(charge_state_data_dict.keys()), figsize=(16, 8), sharex="col")
+        if len(charge_state_data_dict.keys()) == 1:
+            axs = np.array([axs])
         fig.subplots_adjust(hspace=0.5)
         fig.suptitle(f"""Charge state for {trajectory_name} trajectory
                          (integrated over {parameters["size"] * pixel_to_angstrom:.1f} Angstrom)""")
@@ -296,7 +298,7 @@ class DataVisualiser:
 
             positions = all_data[key].projectile_positions
             initial_position = positions[0]
-            distance_travelled = np.array([np.linalg.norm(position - initial_position) for position in positions[crop_low : crop_high+1]])
+            distance_travelled = np.array([np.linalg.norm(position - initial_position) for position in positions])
 
             # GOTTEN FROM A DFT SIMULATION OF A SINGLE HYDROGEN ATOM
             # IDK WHERE TO PUT THEM...

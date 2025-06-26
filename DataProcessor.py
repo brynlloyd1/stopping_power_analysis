@@ -101,9 +101,6 @@ class DataProcessor:
         crop_high = parameters["crop_high"]
 
 
-        # size = 10
-        # offset = -3
-
         charge_state_data_dict = {}
         for energy, data in all_data.items():
 
@@ -117,6 +114,7 @@ class DataProcessor:
 
             projectile_positions = data.projectile_positions
             electron_densities = data.electron_densities
+            electron_density_shape = np.shape(electron_densities[0])
             cell = data.cell
 
             projectile_position_indices = DataProcessor.find_projectile(projectile_positions, electron_densities[0], cell)
@@ -124,22 +122,65 @@ class DataProcessor:
             density_around_projectile = []
             for t, electron_density in enumerate(electron_densities):
 
-                # cutoff to avoid doing this when the projectile crosses the system boundaries
-                if t < crop_low or t > crop_high:
-                    continue
+                # fixing PBC issue
+                # offset must be removed/reworked bc it just doesnt work for non-channelling trajectories
 
-                proj_index = projectile_position_indices[t]
+                density_sum = 0
 
-                # TODO: need to modify to make this work with pbc's
-                #   rn I just use a crop in the if statement above to avoid the problem
-                if proj_index[0] + offset < size or proj_index[0] + size + offset > np.shape(electron_densities)[1]:
-                    density_around_projectile.append(None)
-                    continue
-                density_around_projectile.append(np.sum(electron_density[proj_index[0] - size + offset : proj_index[0] + size + offset,
-                                                                                  proj_index[1] - size : proj_index[1] + size,
-                                                                                  proj_index[2] - size : proj_index[2] + size]))
+                # NOT CORRECT
+                # for i in range(electron_density_shape[0]):
+                #     for j in range(electron_density_shape[1]):
+                #         for k in range(electron_density_shape[2]):
 
-            charge_state_data = ChargeStateData(np.array(density_around_projectile), [crop_low, crop_high], size, offset)
+
+                # ITERATE OVER A CUBE OF POSITIONS IN THE VICINITY OF THE PROJECTILE
+                # FIRST JUST CHECK ITS IN A SPHERE CENTERED ON THE PROJECTILE
+                # MAP THOSE VALUES BACK ONTO THE CELL BC PBC'S
+                # AND THEN ADD UP THE ELECTRON DENSITIES IN A SPHERE AROUND PROJECTILE
+                projectile_position_index = projectile_position_indices[t]
+                start = projectile_position_index - size
+                stop = projectile_position_index + size
+                for i in range(start[0], stop[0]):
+                    for j in range(start[1], stop[1]):
+                        for k in range(start[2], stop[2]):
+
+
+                            pos = np.array([i, j, k])
+                            dist_to_projectile = np.linalg.norm(pos - projectile_position_indices[t])
+                            if dist_to_projectile > size:
+                                continue
+
+
+                            pos_inside_cell = pos % electron_density_shape
+                            density_sum += electron_density[pos_inside_cell[0], pos_inside_cell[1], pos_inside_cell[2]]
+
+                density_around_projectile.append(density_sum)
+
+
+
+
+
+
+
+
+
+                #
+                # # cutoff to avoid doing this when the projectile crosses the system boundaries
+                # if t < crop_low or t > crop_high:
+                #     continue
+                #
+                # proj_index = projectile_position_indices[t]
+                #
+                # if proj_index[0] + offset < size or proj_index[0] + size + offset > np.shape(electron_densities)[1]:
+                #     density_around_projectile.append(None)
+                #     continue
+                # density_around_projectile.append(np.sum(electron_density[proj_index[0] - size + offset : proj_index[0] + size + offset,
+                #                                                                   proj_index[1] - size : proj_index[1] + size,
+                #                                                                   proj_index[2] - size : proj_index[2] + size]))
+
+
+            # TODO: remove crop and offset, but for now just set both to zero
+            charge_state_data = ChargeStateData(np.array(density_around_projectile), [0, 0], size, offset)
             charge_state_data_dict[energy] = charge_state_data
 
         return charge_state_data_dict

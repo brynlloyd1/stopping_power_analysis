@@ -109,7 +109,7 @@ class GroundStateAnalysis:
 
 
 if __name__ == "__main__":
-    path_to_file = ("/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/dft_data/Al_ground_state_far.gpw")
+    path_to_file = ("/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/Al_stopping_ground_state.gpw")
     a = GroundStateAnalysis(path_to_file)
     print(a.calculate_projectile_charge_state())
     a.visualise_electron_density()
