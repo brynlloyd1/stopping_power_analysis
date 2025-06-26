@@ -154,10 +154,10 @@ class DataVisualiser:
                 # plot fits and uncertainties
                 axs[i, 0].plot(distance_travelled, pfit(distance_travelled), color="red", label=label)
 
-                axs[i, 1].plot([distance_travelled[0], distance_travelled[-1]], [-fit[0], -fit[0]], color="red")
+                axs[i, 1].plot([distance_travelled[0], distance_travelled[-1]], [-fit[0], -fit[0]], color="red", label=label)
                 axs[i, 1].fill_between(distance_travelled, np.ones(len(distance_travelled))*-fit[0] - stopping_power_uncertainty,
                                                         np.ones(len(distance_travelled))*-fit[0] + stopping_power_uncertainty,
-                                                        color="red", alpha=0.25, label=label)
+                                                        color="red", alpha=0.25)
 
                 # plot points used in the fitting
                 n_timesteps = len(distance_travelled)
@@ -191,6 +191,8 @@ class DataVisualiser:
             # stopping_powers = -1e3 * fit_info.fit[0]   # want to plot in eV/Ang
             stopping_powers = [-1e3 * fit.fit[0] for fit in fit_info.values()]
             ax.plot(energies, stopping_powers, "-x", label=trajectory_name)
+
+        ax.set_xlim((0, 200))
         ax.legend()
         plt.show()
 

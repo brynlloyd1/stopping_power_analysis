@@ -1,5 +1,4 @@
 from gpaw import restart, setup_paths
-# from ase.units import eV, _amu
 
 import numpy as np
 import pandas as pd
@@ -96,14 +95,15 @@ class DataLoader:
 
         return filename_dict
 
-    def load_data(self, force_load_gpw: bool = False) -> Dict[str, Data]:
+    def load_data(self, force_load_gpw: bool = False, force_write_csv: bool = False) -> Dict[str, Data]:
         """
         If .csv files exist, loads position and kinetic energy data from them
         if not, uses gpaw.restart to load in atoms, calc
         Data that is loaded is stored in an instance of Data
 
         Parameters:
-            force_load_gpw (bool)
+            force_load_gpw (bool): would set to True if you need to access atoms and calc from gpaw.restart
+            force_write_csv (bool): would set to True if the data has changed, but the csv files still exist
 
         Returns:
             all_data (Dict[str, Data]): key is energy, value is Data instance
@@ -125,7 +125,7 @@ class DataLoader:
             if energy not in all_csv_files.keys() or force_load_gpw:
                 if not force_load_gpw:
                     logger.info(f"csv not found for {energy} in {os.path.basename(self.directory.rstrip("/"))}, loading gpw files...")
-                write_flag = not (energy in all_csv_files.keys())  # only want to write if the csv files don't already exist
+                write_flag = not (energy in all_csv_files.keys()) or force_write_csv  # only want to write if the csv files don't already exist
 
                 for filename in all_gpw_files[energy]:
                     atoms, calc = restart(self.directory + filename)
@@ -134,13 +134,15 @@ class DataLoader:
 
                     data.projectile_positions = np.vstack([data.projectile_positions, atoms.get_positions()[-1]])
 
-                    # TODO: THIS GIVES KINETIC ENERGY OF ENTIRE SYSTEM
-                    #       CODE BELOW CALCULATES FROM VELOCITIES, BUT THERE IS A MISTAKE IN THE UNITS SOMEWHERE
-                    data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, atoms.get_kinetic_energy())
-                    # projectile_velocities = atoms.get_velocities()[-1] * 100   # A/ps -> m/s
-                    # projectile_mass = atoms.get_masses()[-1] * _amu   # atomic mass units -> kg
-                    # kinetic_energy = 0.5 * projectile_mass * np.sum(projectile_velocities**2) / eV   # Joules -> eV
-                    # data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, kinetic_energy)
+
+                    # this is the kinetic energy of the entire system
+                    # data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, atoms.get_kinetic_energy())
+
+                    # this is how ase calculates kinetic energy
+                    projectile_momentum = atoms.get_momenta()[-1]
+                    projectile_velocity = atoms.get_velocities()[-1]   # A/ps -> m/s
+                    projectile_kinetic_energy = 0.5 * np.vdot(projectile_momentum, projectile_velocity)
+                    data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, projectile_kinetic_energy)
 
                     data.cell = np.diag(atoms.get_cell())
 

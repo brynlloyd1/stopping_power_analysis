@@ -49,18 +49,20 @@ class EhrenfestAnalysis:
 
     def load_data(self,
                   trajectory_name: str,
-                  force_load_gpw = False):
+                  force_load_gpw: bool = False,
+                  force_write_csv: bool = False):
         """
         instructs the instance of DataLoader stored in the DataHandler instance to load in the data
 
         Parameters:
             trajectory_name (str)
             force_load_gpw (bool, optional): Can force loading of gpw files (vs loading csv files), e.g. if you want to use electron_densities
+            force_write_csv (bool, optional): Can force writing csv files, eg if stopping data has changed
         """
 
         data_handler: DataHandler = self.data_handlers[trajectory_name]
         # data_handler.atoms_dict, data_handler.calc_dict = data_handler.data_loader.load_data()
-        data_handler.all_data = data_handler.data_loader.load_data(force_load_gpw)
+        data_handler.all_data = data_handler.data_loader.load_data(force_load_gpw, force_write_csv)
 
     def load_densities(self,
                        trajectory_name: str):
@@ -71,9 +73,8 @@ class EhrenfestAnalysis:
         data_handler: DataHandler = self.data_handlers[trajectory_name]
         all_data_temp = data_handler.data_loader.load_densities()
 
-        # check if projectile positions has been written to. If so, need to modify the electron_densities attribute
-        # otherwise, can just overwrite all_data with the return of load_densities
-
+        # have to add this to all_data differently, depending on whether it already contains
+        # Data instances and so has attributes to modify, or need to create the instances
         if not data_handler.all_data:
             data_handler.all_data = all_data_temp
         else:
@@ -142,11 +143,6 @@ class EhrenfestAnalysis:
         loader: DataLoader = handler.data_loader
         visualiser = handler.data_visualiser
 
-        # TODO: NEED TO CHECK FOR ELECTRON DENSITIES
-        # this doesnt work if showing electron densities in the first thing you do bc all_data has no keys
-        # if handler.all_data[energy].electron_densities is None:
-        #     loader.load_densities()
-
         if not loader.density_data_loaded:
             self.load_densities(trajectory_name)
 
@@ -174,5 +170,3 @@ class EhrenfestAnalysis:
 
         charge_state_data_dict: Dict[str, ChargeStateData] = processor.get_electrons_around_proton(data_handler.all_data, parameters)
         visualiser.plot_charge_state(trajectory_name, charge_state_data_dict, parameters, data_handler.all_data)
-        # visualiser.compare_charge_states(trajectory_names)
-
