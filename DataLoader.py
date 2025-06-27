@@ -20,6 +20,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Data:
+    """
+    holds anything that can be loaded from data files,
+    eg atoms/calc from loading gpw files,
+    projectile positions and energies from loading csv's
+    or electrond densities from loading npy files
+    """
+
     # needs default values because some attributes will be left empty, depending on which data is being loaded
     atoms_list: List[Atoms] = field(default_factory=list)
     calc_list: List[GPAW] = field(default_factory=list)
@@ -31,13 +38,16 @@ class Data:
     cell: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
 
 class DataLoader:
-    def __init__(self, directory):
+    def __init__(self, directory: str):
         """
         (data loader doesn't store any data - all data is passed back to the data handler class)
+
+        Parameters:
+            directory (str)
         """
-        self.directory = directory
-        self.which_energies = ["all"]
-        self.which_timesteps = "all"
+        self.directory: str = directory
+        self.which_energies: List[str] = ["all"]
+        self.which_timesteps: str = "all"   # not actually supported anymore to set timesteps, but its also not really needed
 
         self._energy_regex_pattern = re.compile(r"(\d+)k")
         self._timestep_regex_pattern = re.compile(r"k_step(\d+)")
@@ -49,15 +59,18 @@ class DataLoader:
         self.stopping_data_loaded: bool = False
         self.density_data_loaded: bool = False
 
-    def get_files(self, kind: str) -> Dict[str, str]:
+    def get_files(self, kind: str) -> Dict[str, List[str]]:
         """
-        returns a dictionary of all files of a given type, separated by their energies
+        returns a dictionary of all files of a given type, keys are energies, values are lists of filenames
 
         Parameters:
             kind (str)
+
+        Returns:
+            Dict[str, List[str]]
         """
         all_files = os.listdir(self.directory)
-        all_files_kind = [f for f in all_files if f.endswith("." + kind)]
+        all_files_kind: List[str] = [f for f in all_files if f.endswith("." + kind)]
 
         filenames_temp = {}
         if kind == "csv" or kind == "npy":
@@ -85,7 +98,7 @@ class DataLoader:
                 _, filenames_sorted = zip(*paired)
                 filenames_temp[energy] = list(filenames_sorted)
         else:
-            raise ValueError("kind must be 'csv' or 'gpw'")
+            raise ValueError("kind must be 'csv', 'npy' or 'gpw'")
 
         # rename keys
         filenames_temp = {f"{key} keV": value for key, value in filenames_temp.items()}
@@ -109,7 +122,6 @@ class DataLoader:
             all_data (Dict[str, Data]): key is energy, value is Data instance
         """
 
-        # check if existence of csv files
         all_gpw_files = self.get_files("gpw")
         all_csv_files = self.get_files("csv")
 
@@ -140,7 +152,7 @@ class DataLoader:
 
                     # this is how ase calculates kinetic energy
                     projectile_momentum = atoms.get_momenta()[-1]
-                    projectile_velocity = atoms.get_velocities()[-1]   # A/ps -> m/s
+                    projectile_velocity = atoms.get_velocities()[-1]
                     projectile_kinetic_energy = 0.5 * np.vdot(projectile_momentum, projectile_velocity)
                     data.projectile_kinetic_energies = np.append(data.projectile_kinetic_energies, projectile_kinetic_energy)
 

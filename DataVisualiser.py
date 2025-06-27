@@ -6,9 +6,10 @@ from matplotlib.widgets import Slider
 import utils
 
 # imports for typing
-from typing import Dict
+from typing import Dict, List
 from DataLoader import Data
-from DataProcessor import Fit
+from DataProcessor import Fit, ChargeStateData
+from numpy.typing import NDArray
 
 import logging
 
@@ -24,6 +25,8 @@ class DataVisualiser:
 
         path_to_srim_data = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/Hydrogen_in_Aluminium_SRIM.txt"
         self.srim_stopping_data = self.load_srim(path_to_srim_data)
+        path_to_srim_experimental_data = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/H_in_Aluminium_experimental.csv"
+        self.srim_experimental_data = self.load_srim_experimental(path_to_srim_experimental_data)
 
     ########################################
     # FOR PLOTTING STOPPING POWER ANALYSIS #
@@ -61,6 +64,19 @@ class DataVisualiser:
         data_df["E_k [keV]"] = np.array([utils.round_sf(x) for x in data_df["E_k [keV]"].to_numpy()])
 
         return data_df
+
+    def load_srim_experimental(self, path: str) -> pd.DataFrame:
+
+        E15eVcm2atom_to_evA_conversion = 1.6582 # this number is from the bottom of the SRIM data file (not experimental data file)
+
+        raw_data = pd.read_csv(path)
+        # some of them are deuterium and tritium
+        data = pd.DataFrame(data = {
+            "E_k [keV]" : raw_data[raw_data["ion_isotope"] == 1.0]["energy"],
+            "S [eV/A]" : raw_data[raw_data["ion_isotope"] == 1.0]["stopping_power"] / E15eVcm2atom_to_evA_conversion,
+        })
+
+        return data
 
     def plot_all_fits(self, trajectory_name: str, all_data: Dict[str, Data], fits):
 
@@ -105,21 +121,15 @@ class DataVisualiser:
             # plot gradient of kinetic energy on right plot
             axs[i, 1].plot(distance_travelled[:-1], -np.diff(kinetic_energies)/np.diff(distance_travelled))
 
-
-            ######################
-            # PLOT GEANT4 DATA?? #
-            ######################
             plot_geant4_stopping = False
             if plot_geant4_stopping:
                 try:
                     index = np.where(self.geant4_stopping_data["energies"] == int(energy.rstrip(" keV")))[0]
                     pfit = np.poly1d([-1e-3*self.geant4_stopping_data["stopping powers"][index][0], self.geant4_stopping_data["energies"][index][0]])
                     axs[i, 0].plot(distance_travelled, pfit(distance_travelled), label=rf"Geant4: $S_e$ = {self.geant4_stopping_data['stopping powers'][index][0]:.1f} [eV/$\AA$]")
-                except:
-                    logger.info(f"no geant4 fit for {energy}")
+                except Exception as e:
+                    logger.info(f"no geant4 fit for {energy}, error: {e}")
 
-
-            # TODO: WONT FIND ANYTHING AT ALL
             plot_srim_stopping = True
             if plot_srim_stopping:
                 try:
@@ -175,16 +185,15 @@ class DataVisualiser:
         plots comparison to Monte Carlo stopping curve
 
         Parameters:
-        stopping_power_data (Dict[str, np.ndarray()])
+        stopping_power_data (Dict[str, Dict[str, Fit]]) where keys are trajectory names, values are a dictionary with energies as keys, Fit instances as values
         """
-        # TODO: change parameters stopping_power_data to a Fit instance or something idk
         fig,ax = plt.subplots(figsize=(15,5))
         ax.set_xlabel("projectile initial kinetic energy [keV]")
         ax.set_ylabel(r"stopping power [eV/$\AA$]")
 
         # ax.plot(self.geant4_stopping_data["energies"], self.geant4_stopping_data["stopping powers"], "-", label="GEANT4")
-
         ax.plot(self.srim_stopping_data["E_k [keV]"], self.srim_stopping_data["S [eV/A]"], label="SRIM")
+        ax.plot(self.srim_experimental_data["E_k [keV]"], self.srim_experimental_data["S [eV/A]"], ".", color="lightgray", label="experimental data")
 
         for trajectory_name, fit_info in all_fit_info.items():
             energies = [int(energy_string.rstrip(" keV")) for energy_string in list(fit_info.keys())]
@@ -192,7 +201,10 @@ class DataVisualiser:
             stopping_powers = [-1e3 * fit.fit[0] for fit in fit_info.values()]
             ax.plot(energies, stopping_powers, "-x", label=trajectory_name)
 
-        ax.set_xlim((0, 200))
+        # ax.set_xlim((0, 200))
+
+        ax.set_xscale("log")
+        ax.set_xlim((0.5, 250))
         ax.legend()
         plt.show()
 
@@ -202,7 +214,7 @@ class DataVisualiser:
     ######################################
 
 
-    def visualise_electron_density(self, electron_densities):
+    def visualise_electron_density(self, electron_densities: NDArray):
         """uses matplotlib widget sliders to create interactive plot to visualise electron density"""
         max_t = np.shape(electron_densities)[0] - 1
         max_slice = np.shape(electron_densities)[2] - 1
@@ -295,12 +307,16 @@ class DataVisualiser:
 
 
 
-    def plot_charge_state(self, trajectory_name, charge_state_data_dict, parameters, all_data, single_plot = False):
+    def plot_charge_state(self,
+                          trajectory_name: str,
+                          charge_state_data_dict: Dict[str, List[ChargeStateData]],
+                          parameters: Dict[str, int],
+                          all_data: Dict[str, Data]):
         """
         plots charge state around the proton for each of the energies simulated for a given trajectory
         Parameters:
             trajectory_name (str)
-            charge_state_data_dict (Dict[str, List])
+            charge_state_data_dict (Dict[str, List[ChargeStateData]])
             parameters (Dict[str, int])
             all_data (Dict[str, Data])
         """

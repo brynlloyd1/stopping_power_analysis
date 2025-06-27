@@ -7,6 +7,15 @@ setup_logging()
 logger = logging.getLogger(__name__)
 logger.info("Starting Ehrenfest Analysis")
 
+"""
+hydrogen -> just a hydrogen
+proton -> hydrogen with external potential around the starting location
+proton1 -> hydrogen with external potential that follows the proton
+proton2 -> custom setup of hydrogen with valence state removed
+proton3 -> custom setup of hydrogen with valence state removed + external potential around starting location
+"""
+
+
 # parameters for the charge state analysis
 parameters = {
     "size" : 5,
@@ -27,11 +36,9 @@ directory_622_hyperchannelling_hydrogen = "/Users/brynlloyd/Developer/Coding/Pyt
 name_622_hyperchannelling_hydrogen = analysis.initialise_analysis(directory_622_hyperchannelling_hydrogen)
 # analysis.set_which_energies(name_622_hyperchannelling_hydrogen, which_energies = ["40 keV"])
 # analysis.load_data(name_622_hyperchannelling_hydrogen, force_load_gpw=True)
-
-
-
+# analysis.visualise_electron_density(name_622_hyperchannelling_hydrogen, "40 keV")
 analysis.calculate_stopping_curve(name_622_hyperchannelling_hydrogen)
-analysis.view_fits(name_622_hyperchannelling_hydrogen)
+# analysis.view_fits(name_622_hyperchannelling_hydrogen)
 
 
 
@@ -55,9 +62,13 @@ analysis.view_fits(name_622_hyperchannelling_hydrogen)
 
 directory_333_presampled1_proton = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton/"
 name_333_presampled1_proton = analysis.initialise_analysis(directory_333_presampled1_proton)
+# analysis.load_data(name_333_presampled1_proton, force_load_gpw = True, force_write_csv = True)
 analysis.calculate_stopping_curve(name_333_presampled1_proton)
-analysis.view_fits(name_333_presampled1_proton)
-analysis.compare_to_montecarlo([name_622_hyperchannelling_hydrogen, name_333_presampled1_proton])
+# analysis.view_fits(name_333_presampled1_proton)
+analysis.compare_to_montecarlo([name_333_presampled1_proton, name_622_hyperchannelling_hydrogen])
+# analysis.visualise_electron_density(name_333_presampled1_proton, energy = "40 keV")
+
+
 ###################   proton that might actually be hydrogen    ########################
 # directory_622_hyperchannelling_proton2 = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/622_hyperchannelling_proton2/"
 # name_622_hyperchannelling_proton2 = analysis.initialise_analysis(directory_622_hyperchannelling_proton2)
@@ -78,11 +89,11 @@ analysis.compare_to_montecarlo([name_622_hyperchannelling_hydrogen, name_333_pre
 
 
 
-directory_422_hyperchannelling_proton3_surface = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/422_hyperchannelling_proton3_surface/"
-name_422_hyperchannelling_proton3_surface = analysis.initialise_analysis(directory_422_hyperchannelling_proton3_surface)
-analysis.calculate_stopping_curve(name_422_hyperchannelling_proton3_surface, crop = [15, 49])
-analysis.view_fits(name_422_hyperchannelling_proton3_surface)
-analysis.analyse_proton_charge_state(name_422_hyperchannelling_proton3_surface, parameters)
+# directory_422_hyperchannelling_proton3_surface = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/422_hyperchannelling_proton3_surface/"
+# name_422_hyperchannelling_proton3_surface = analysis.initialise_analysis(directory_422_hyperchannelling_proton3_surface)
+# analysis.calculate_stopping_curve(name_422_hyperchannelling_proton3_surface, crop = [15, 49])
+# analysis.view_fits(name_422_hyperchannelling_proton3_surface)
+# analysis.analyse_proton_charge_state(name_422_hyperchannelling_proton3_surface, parameters)
 # analysis.visualise_electron_density(name_422_hyperchannelling_proton3_surface, energy = "1000 keV")
 
 
