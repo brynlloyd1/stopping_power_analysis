@@ -122,6 +122,13 @@ class EhrenfestAnalysis:
         visualiser = handler.data_visualiser
         visualiser.plot_all_fits(trajectory_name, handler.all_data, handler.fits)
 
+    def compare_fits(self, trajectory_names: List[str], energy: str):
+        comparison_data: Dict[str, Data] = {
+            trajectory_name: self.data_handlers[trajectory_name].all_data[energy] for trajectory_name in trajectory_names
+        }
+        self.data_handlers[trajectory_names[0]].data_visualiser.compare_fits(trajectory_names, energy, comparison_data)
+
+
 
     def compare_to_montecarlo(self, trajectory_names: List[str]):
         """creates a dictionary of trajectory_name : fits for that trajectory, and passes to visualiser"""
@@ -150,7 +157,7 @@ class EhrenfestAnalysis:
         visualiser.visualise_electron_density(electron_density_list)
 
 
-    def analyse_proton_charge_state(self, trajectory_name, parameters):
+    def analyse_proton_charge_state(self, trajectory_name: str, parameters: Dict[str, int]):
         """
         data processor calculates the charge state of the proton by summing the electron density around the proton up to a cutoff radius
         data visualiser plots the proton charge state over time

@@ -66,6 +66,7 @@ class DataVisualiser:
         return data_df
 
     def load_srim_experimental(self, path: str) -> pd.DataFrame:
+        """ https://www-nds.iaea.org/stopping/tuples/H-Al """
 
         E15eVcm2atom_to_evA_conversion = 1.6582 # this number is from the bottom of the SRIM data file (not experimental data file)
 
@@ -143,7 +144,7 @@ class DataVisualiser:
                     axs[i, 1].axhline(1e-3 * stopping_power_SRIM, color="C1", label=rf"SRIM: S = {stopping_power_SRIM:.1f} [eV/$\AA$]")
 
                 except Exception as e:
-                    logging.warn(f"no srim fit for {energy}, error: {e}")
+                    logging.warning(f"no srim fit for {energy}, error: {e}")
 
             ########################
             # PLOT STOPPING FITS?? #
@@ -178,7 +179,42 @@ class DataVisualiser:
 
         plt.show()
 
-    # def montecarlo_comparison(self, stopping_power_data):
+    def compare_fits(self, trajectory_names: List[str], energy: str, comparison_data: Dict[str, Data]):
+        fig,axs = plt.subplots(1, 2, figsize=(12, 7))
+        axs[0].set_title("projectile KE")
+        axs[1].set_title("instantaneous stopping power")
+
+        _ = [ax.set_xlabel("distance travelled [Angstrom]") for ax in axs]
+        axs[0].set_ylabel("KE [eV]")
+        axs[1].set_ylabel("S [eV/$\AA$]")
+
+        for trajectory_name in trajectory_names:
+            projectile_positions = comparison_data[trajectory_name].projectile_positions
+            projectile_distances = np.array([np.linalg.norm(position - projectile_positions[0]) for position in projectile_positions])
+            projectile_kinetic_energies = comparison_data[trajectory_name].projectile_kinetic_energies
+
+            axs[0].plot(projectile_distances, projectile_kinetic_energies, label=trajectory_name)
+            axs[1].plot(projectile_distances[:-1], -np.diff(projectile_kinetic_energies)/np.diff(projectile_distances), label=trajectory_name)
+
+
+        plot_srim_stopping = True
+        if plot_srim_stopping:
+            try:
+                energy_val = utils.round_sf(float(energy.rstrip(" keV")))
+                row = self.srim_stopping_data.loc[self.srim_stopping_data["E_k [keV]"] == energy_val]
+                stopping_power_SRIM = row["S [eV/A]"].values[0]
+                energy_SRIM = row["E_k [keV]"].values[0]
+
+                p = np.poly1d([-1 * stopping_power_SRIM, 1e3*energy_SRIM])
+                axs[0].plot(projectile_distances, p(projectile_distances), "--", color="red", alpha=0.75, label=rf"SRIM: S = {stopping_power_SRIM:.1f} [eV/$\AA$]")
+                axs[1].axhline(stopping_power_SRIM, ls="--", color="red", alpha=0.75, label=rf"SRIM: S = {stopping_power_SRIM:.1f} [eV/$\AA$]")
+
+            except Exception as e:
+                logging.warning(f"no srim fit for {energy}, error: {e}")
+
+        _ = [ax.legend() for ax in axs]
+        plt.show()
+
     def montecarlo_comparison(self, all_fit_info: Dict[str, Dict[str, Fit]]):
 
         """
@@ -201,10 +237,11 @@ class DataVisualiser:
             stopping_powers = [-1e3 * fit.fit[0] for fit in fit_info.values()]
             ax.plot(energies, stopping_powers, "-x", label=trajectory_name)
 
-        # ax.set_xlim((0, 200))
+        ax.set_xlim((-500, 2000))
 
-        ax.set_xscale("log")
-        ax.set_xlim((0.5, 250))
+        # TODO: add option to log scale plot because a lot of papers seem to plot things this way
+        # ax.set_xscale("log")
+        # ax.set_xlim((0.5, 500))
         ax.legend()
         plt.show()
 

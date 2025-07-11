@@ -54,7 +54,7 @@ class DataLoader:
         self._energy_timestep_regex_pattern = re.compile(r"(\d+)k_step(\d+)")
 
         # tells gpaw where to look for the custom setups that are sometimes used
-        setup_paths.insert(0, "./")
+        setup_paths.insert(0, "./custom_setups")
 
         self.stopping_data_loaded: bool = False
         self.density_data_loaded: bool = False
@@ -140,7 +140,11 @@ class DataLoader:
                 write_flag = not (energy in all_csv_files.keys()) or force_write_csv  # only want to write if the csv files don't already exist
 
                 for filename in all_gpw_files[energy]:
-                    atoms, calc = restart(self.directory + filename)
+                    try:
+                        atoms, calc = restart(self.directory + filename)
+                    except Exception as e:
+                        logging.warning(f"failed to read file {filename}, skipping: {e}")
+                        continue
                     data.atoms_list.append(atoms)
                     data.calc_list.append(calc)
 
