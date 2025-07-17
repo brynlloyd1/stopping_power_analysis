@@ -9,6 +9,7 @@ from DataLoader import Data
 from DataProcessor import DataProcessor, Fit, ChargeStateData
 from DataVisualiser import DataVisualiser
 from DataLoader import DataLoader
+from trajectory_presampling import TrajectorySampler, Trajectory
 
 import logging
 
@@ -17,6 +18,7 @@ logging.getLogger(__name__)
 class EhrenfestAnalysis:
     def __init__(self):
         self.data_handlers = {}
+        self.trajectory_presampler = None   # avoid initialising until its required
 
     def initialise_analysis(self, directory):
         """
@@ -137,6 +139,17 @@ class EhrenfestAnalysis:
         self.data_handlers[trajectory_names[0]].data_visualiser.montecarlo_comparison(all_fit_info)
 
 
+    def initialise_presampling(self):
+        self.trajectory_presampler = TrajectorySampler()
+
+    def compare_to_presampling(self, trajectory_name: str, energy: str):
+        self.initialise_presampling()
+        data_handler: DataHandler = self.data_handlers[trajectory_name]
+        visualiser: DataVisualiser = data_handler.data_visualiser
+        data =  data_handler.all_data[energy]
+        visualiser.compare_to_presampling(trajectory_name, energy, data, self.trajectory_presampler)
+
+
 
     ###########################
     # ELECTRON DENSITY THINGS #
@@ -177,3 +190,7 @@ class EhrenfestAnalysis:
 
         charge_state_data_dict: Dict[str, ChargeStateData] = processor.get_electrons_around_proton(data_handler.all_data, parameters)
         visualiser.plot_charge_state(trajectory_name, charge_state_data_dict, parameters, data_handler.all_data)
+
+    def get_data(self, trajectory_name: str) -> Dict[str, Data]:
+        handler = self.data_handlers[trajectory_name]
+        return handler.all_data

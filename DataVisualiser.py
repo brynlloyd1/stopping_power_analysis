@@ -177,7 +177,7 @@ class DataVisualiser:
                 axs[i, 0].legend()
                 axs[i, 1].legend()
 
-        plt.show()
+        plt.show(block=False)
 
     def compare_fits(self, trajectory_names: List[str], energy: str, comparison_data: Dict[str, Data]):
         fig,axs = plt.subplots(1, 2, figsize=(12, 7))
@@ -186,7 +186,7 @@ class DataVisualiser:
 
         _ = [ax.set_xlabel("distance travelled [Angstrom]") for ax in axs]
         axs[0].set_ylabel("KE [eV]")
-        axs[1].set_ylabel("S [eV/$\AA$]")
+        axs[1].set_ylabel(r"S [eV/$\AA$]")
 
         for trajectory_name in trajectory_names:
             projectile_positions = comparison_data[trajectory_name].projectile_positions
@@ -212,8 +212,40 @@ class DataVisualiser:
             except Exception as e:
                 logging.warning(f"no srim fit for {energy}, error: {e}")
 
+
         _ = [ax.legend() for ax in axs]
-        plt.show()
+        plt.show(block=False)
+
+    def compare_to_presampling(self, trajectory_name: str, energy: str, data: Data, presampler):
+
+        fig,ax = plt.subplots()
+        ax.set_title(f"comparison to trajectory presampling for {trajectory_name}")
+
+        projectile_positions = data.projectile_positions
+        projectile_distances = np.array([np.linalg.norm(position - projectile_positions[0]) for position in projectile_positions])
+        projectile_kinetic_energies = data.projectile_kinetic_energies
+
+        ax.plot(projectile_distances, projectile_kinetic_energies, label=trajectory_name)
+        # ax.plot(projectile_distances[:-1], -np.diff(projectile_kinetic_energies) / np.diff(projectile_distances), label=trajectory_name)
+
+
+        trajectory_params = {
+            "starting_position" : data.starting_position,
+            "direction" : data.direction,
+        }
+        presampler.set_supercell(data.supercell_size)
+        presampler.set_path_length(np.max(projectile_distances))
+
+        P_traj, _ = presampler.calculate_Ptraj_supercell(kind="custom", params=trajectory_params)   # (also returns the trajectory which isnt of use here)
+        P_traj_xs = np.linspace(0, presampler.path_length, presampler.Ptraj_nsamples)
+        # _, P_traj_binned, _ = presampler.calculate_trajectory_metric(P_traj)
+        ax2 = ax.twinx()
+        ax2.plot(P_traj_xs, P_traj, color="black", alpha=0.2)
+        ax2.set_ylim((0, 2.75))
+
+
+
+
 
     def montecarlo_comparison(self, all_fit_info: Dict[str, Dict[str, Fit]]):
 
@@ -243,7 +275,7 @@ class DataVisualiser:
         # ax.set_xscale("log")
         # ax.set_xlim((0.5, 500))
         ax.legend()
-        plt.show()
+        plt.show(block=False)
 
 
     ######################################
@@ -257,8 +289,8 @@ class DataVisualiser:
         max_slice = np.shape(electron_densities)[2] - 1
 
         # Initial values
-        init_t = 6
-        init_slice = 48
+        init_t = 0
+        init_slice = 40
 
         # Create two vertically stacked subplots
         fig, (ax_density, ax_change) = plt.subplots(2, 1, figsize=(12, 10))
@@ -273,7 +305,6 @@ class DataVisualiser:
         # Color scale limits
         vlim_change = np.max(np.abs(electron_density_change_image))
         log_vmin_density = np.min(log_electron_image)
-        # log_vmin_density = -2
         log_vmax_density = np.max(log_electron_image)
 
         # Electron density plot
@@ -387,7 +418,7 @@ class DataVisualiser:
             # axs[i].axhline(np.mean(charge_state), linestyle = "--", color="red", label=f"average charge state = {np.mean(charge_state):.2f}")
             axs[i].set_title(key)
             axs[i].legend()
-        plt.show()
+        plt.show(block=False)
 
 
 

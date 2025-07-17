@@ -1,5 +1,6 @@
 from EhrenfestAnalysis import EhrenfestAnalysis
 
+import matplotlib.pyplot as plt
 from logger_config import setup_logging
 import logging
 
@@ -32,7 +33,8 @@ surface -> projectile is initialised in vacuum and then enters the crystal
 
 TARGET SETUP
 _ -> Al has 10 frozen core states and 3 valence states
-ae -> all-electron (Al has only 4 core states + 7 valence) 
+7valence -> only did this one bc gpaw couldnt make me an 11valence one the first time i tried
+11valence -> only n=1 states are frozen
 """
 
 
@@ -51,30 +53,35 @@ directories = {
     # "322_presampled1_hydrogen" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/322_presampled1_hydrogen/",
 
     # "333_presampled1_proton" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton/",
-    "333_presampled1_proton2" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton2/",
-    # "333_presampled1_proton2_ae" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton2_ae/",
-    # "333_presampled2_proton2": "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled2_proton2/",
+    # "333_presampled1_proton2" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton2/",
+    # "333_presampled1_proton2_7valence" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton2_7valence/",
+    # "333_presampled2_proton2_7valence_200timesteps": "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled1_proton2_7valence_200timesteps/",
+    "333_presampled2_proton2": "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/333_presampled2_proton2/",
+
 
     # "422_hyperchannelling_proton2_surface" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/422_hyperchannelling_proton2_surface/",
     # "422_hyperchannelling_proton3_surface" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/422_hyperchannelling_proton3_surface/",
-    # "422_hyperchannelling_proton2_ae" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/422_hyperchannelling_proton2_ae/",
+    # "422_hyperchannelling_proton2_7valence" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/422_hyperchannelling_proton2_7valence/",
 
     # "622_hyperchannelling_hydrogen" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/622_hyperchannelling_hydrogen/",
     # "622_hyperchannelling_proton" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/622_hyperchannelling_proton/",
     # "622_hyperchannelling_proton2" : "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/622_hyperchannelling_proton2/",
+
+    # "ehhhh": "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/temp/",
 }
 
 names = {key: analysis.initialise_analysis(value) for key, value in directories.items()}
 # this is where you would set_which_energies
-analysis.set_which_energies(*list(names.values()), which_energies = ["400 keV"])
+# analysis.set_which_energies(*list(names.values()), which_energies = ["400 keV"])
 _ = [analysis.load_data(name) for name in names.values()]
-
+energy = "400 keV"
+_ = [analysis.compare_to_presampling(name, energy) for name in names.values()]
 
 """
 see fit to kinetic energy data and instantaneous stopping powers 
 """
-_ = [analysis.calculate_stopping_curve(name) for name in names.values()]
-_ = [analysis.view_fits(name) for name in names.values()]
+# _ = [analysis.calculate_stopping_curve(name) for name in names.values()]
+# _ = [analysis.view_fits(name) for name in names.values()]
 
 
 """
@@ -97,6 +104,7 @@ get stopping curve for each and plot against SRIM
 """
 visualise electron density
 """
-# energy = "40 keV"
+# energy = "400 keV"
 # _ = [analysis.visualise_electron_density(name, energy) for name in names.values()]
 
+plt.show()

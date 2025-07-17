@@ -36,6 +36,9 @@ class Data:
 
     electron_densities: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
     cell: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
+    supercell_size: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
+    starting_position: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
+    direction: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
 
 class DataLoader:
     def __init__(self, directory: str):
@@ -173,8 +176,13 @@ class DataLoader:
                     # from DataLoader.write_csv, the second line will contain information about Atoms.cell()
                     data.cell = np.fromstring(metadata[1].strip("# cell: ")[1: -2], sep=" ")
 
+                    data.supercell_size = np.fromstring(metadata[2].strip().replace("# supercell size: [", "").replace("]", ""), sep=" ")
+                    data.supercell_size = tuple(data.supercell_size.astype(int))
+                    data.starting_position = np.fromstring(metadata[3].strip().replace("# starting_position: [", "").replace("]", ""), sep=" ")
+                    data.direction = np.fromstring(metadata[4].strip().replace("# direction: [", "").replace("]", ""), sep=" ")
+
             if write_flag:
-                self.write_csv(energy, data)
+                self.write_csv(energy, data, overwrite_flag = force_write_csv)
 
             # all_data = self.append_to_dict(all_data, energy, data)
             all_data[energy] = data
@@ -213,7 +221,10 @@ class DataLoader:
         # "#" to start the line makes it easy to load with pandas
         metadata = [
             "# --- additional info ---",
-            f"# cell: {data.cell}"
+            f"# cell: {data.cell}",
+            f"# supercell size: {int(data.cell / 4.05)}",   # for trajectory presampling purposes
+            f"# starting_position: {data.projectile_positions[0]}",
+            f"# direction: {data.atoms_list[0].get_velocities()[-1] / np.linalg.norm(data.atoms_list[0].get_velocities()[-1])}",
         ]
 
         with open(os.path.join(self.directory, filename), "a") as f:
