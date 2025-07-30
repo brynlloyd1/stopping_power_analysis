@@ -1,10 +1,10 @@
-from unittest import loader
-
 from DataHandler import DataHandler
+
+import numpy as np
 
 from dataclasses import field
 # imports for typing
-from typing import List, Dict, Optional
+from typing import List, Dict
 from DataLoader import Data
 from DataProcessor import DataProcessor, Fit, ChargeStateData
 from DataVisualiser import DataVisualiser
@@ -124,11 +124,11 @@ class EhrenfestAnalysis:
         visualiser = handler.data_visualiser
         visualiser.plot_all_fits(trajectory_name, handler.all_data, handler.fits)
 
-    def compare_fits(self, trajectory_names: List[str], energy: str):
+    def compare_stopping_curves(self, trajectory_names: List[str], energy: str):
         comparison_data: Dict[str, Data] = {
             trajectory_name: self.data_handlers[trajectory_name].all_data[energy] for trajectory_name in trajectory_names
         }
-        self.data_handlers[trajectory_names[0]].data_visualiser.compare_fits(trajectory_names, energy, comparison_data)
+        self.data_handlers[trajectory_names[0]].data_visualiser.compare_stopping_curves(trajectory_names, energy, comparison_data)
 
 
 

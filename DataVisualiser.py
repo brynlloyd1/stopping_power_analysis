@@ -179,7 +179,7 @@ class DataVisualiser:
 
         plt.show(block=False)
 
-    def compare_fits(self, trajectory_names: List[str], energy: str, comparison_data: Dict[str, Data]):
+    def compare_stopping_curves(self, trajectory_names: List[str], energy: str, comparison_data: Dict[str, Data]):
         fig,axs = plt.subplots(1, 2, figsize=(12, 7))
         axs[0].set_title("projectile KE")
         axs[1].set_title("instantaneous stopping power")
@@ -228,12 +228,14 @@ class DataVisualiser:
         ax.plot(projectile_distances, projectile_kinetic_energies, label=trajectory_name)
         # ax.plot(projectile_distances[:-1], -np.diff(projectile_kinetic_energies) / np.diff(projectile_distances), label=trajectory_name)
 
-
+        # + 1.0125 IS FOR THE NEWEST RUNS, WHERE I DONT USE ATOMS.CENTER!!!!
+        # WILL HAVE TO REMOVE FOR OLDER DATA, I CANT BE BOTHERED TO MAKE IT WORK WITHOUT HARD CODING
         trajectory_params = {
-            "starting_position" : data.starting_position,
+            "starting_position" : data.starting_position + 1.0125,
             "direction" : data.direction,
         }
-        presampler.set_supercell(data.supercell_size)
+        supercell_size = tuple((data.cell // 4.05).astype(int))
+        presampler.set_supercell(supercell_size)
         presampler.set_path_length(np.max(projectile_distances))
 
         P_traj, _ = presampler.calculate_Ptraj_supercell(kind="custom", params=trajectory_params)   # (also returns the trajectory which isnt of use here)
@@ -242,6 +244,7 @@ class DataVisualiser:
         ax2 = ax.twinx()
         ax2.plot(P_traj_xs, P_traj, color="black", alpha=0.2)
         ax2.set_ylim((0, 2.75))
+        plt.show(block=False)
 
 
 

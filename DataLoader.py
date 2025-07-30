@@ -24,7 +24,7 @@ class Data:
     holds anything that can be loaded from data files,
     eg atoms/calc from loading gpw files,
     projectile positions and energies from loading csv's
-    or electrond densities from loading npy files
+    or electron densities from loading npy files
     """
 
     # needs default values because some attributes will be left empty, depending on which data is being loaded
@@ -36,7 +36,6 @@ class Data:
 
     electron_densities: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
     cell: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
-    supercell_size: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
     starting_position: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
     direction: NDArray[np.float64] = field(default_factory = lambda: np.array([]))
 
@@ -49,6 +48,8 @@ class DataLoader:
             directory (str)
         """
         self.directory: str = directory
+        if not self.directory.endswith("/"):
+            self.directory += "/"
         self.which_energies: List[str] = ["all"]
         self.which_timesteps: str = "all"   # not actually supported anymore to set timesteps, but its also not really needed
 
@@ -175,11 +176,15 @@ class DataLoader:
                     metadata = self.read_metadata(filename)
                     # from DataLoader.write_csv, the second line will contain information about Atoms.cell()
                     data.cell = np.fromstring(metadata[1].strip("# cell: ")[1: -2], sep=" ")
+                    try:
+                        # data.supercell_size = np.fromstring(metadata[2].strip().replace("# supercell size: [", "").replace("]", ""), sep=" ")
+                        # data.supercell_size = tuple(data.supercell_size.astype(int))
+                        data.starting_position = np.fromstring(metadata[2].strip().replace("# starting_position: [", "").replace("]", ""), sep=" ")
+                        data.direction = np.fromstring(metadata[3].strip().replace("# direction: [", "").replace("]", ""), sep=" ")
+                    except Exception as e:
+                        logger.warning(f"failed to parse trajectory info from {filename}: {e}")
+                        continue
 
-                    data.supercell_size = np.fromstring(metadata[2].strip().replace("# supercell size: [", "").replace("]", ""), sep=" ")
-                    data.supercell_size = tuple(data.supercell_size.astype(int))
-                    data.starting_position = np.fromstring(metadata[3].strip().replace("# starting_position: [", "").replace("]", ""), sep=" ")
-                    data.direction = np.fromstring(metadata[4].strip().replace("# direction: [", "").replace("]", ""), sep=" ")
 
             if write_flag:
                 self.write_csv(energy, data, overwrite_flag = force_write_csv)
@@ -217,15 +222,34 @@ class DataLoader:
             "projectile KE [eV]" : data.projectile_kinetic_energies
         }).to_csv(self.directory + filename, index=False)
 
-        # WRITE ADDITIONAL INFORMATION TO THE BOTTOM OF THE CSV FILE
-        # "#" to start the line makes it easy to load with pandas
+
+
         metadata = [
             "# --- additional info ---",
             f"# cell: {data.cell}",
-            f"# supercell size: {int(data.cell / 4.05)}",   # for trajectory presampling purposes
             f"# starting_position: {data.projectile_positions[0]}",
             f"# direction: {data.atoms_list[0].get_velocities()[-1] / np.linalg.norm(data.atoms_list[0].get_velocities()[-1])}",
         ]
+        self.write_metadata(filename, metadata, overwrite_flag=overwrite_flag)
+
+    def write_metadata(self, filename: str, metadata: list[str], overwrite_flag: bool = False):
+        """
+        WRITE ADDITIONAL INFORMATION TO THE BOTTOM OF THE CSV FILE
+        "#" to start the line makes it easy to load with pandas
+        """
+
+        # check for existing metadata, and remove if present
+        if overwrite_flag:
+            with open(os.path.join(self.directory, filename), "r") as f:
+                lines = f.readlines()
+            try:
+                metadata_index = next(i for i, line in enumerate(lines) if line.strip() == "# --- additional info ---")
+                with open(os.path.join(self.directory, filename), "w") as f:
+                    f.writelines(lines[:metadata_index])
+            except StopIteration:
+                pass
+
+       # write metadata
 
         with open(os.path.join(self.directory, filename), "a") as f:
             for line in metadata:
@@ -234,7 +258,7 @@ class DataLoader:
     def read_metadata(self, filename: str) -> List[str]:
         """
         Parameters:
-            path_to_csv_file (str)
+            filename (str)
         Returns:
             metadata (List[str])
         """
